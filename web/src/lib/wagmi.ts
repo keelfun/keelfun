@@ -12,8 +12,8 @@ if (WC_PROJECT_ID) {
       metadata: {
         name: BRAND,
         description: "Fair launches on Base",
-        url: "https://keelfun.xyz",
-        icons: ["https://keelfun.xyz/icon.png"],
+        url: "https://keelfun.app",
+        icons: ["https://keelfun.app/icon.png"],
       },
       qrModalOptions: { themeMode: "dark", themeVariables: { "--wcm-accent-color": "#CCFF00", "--wcm-z-index": "1000" } },
     }),
