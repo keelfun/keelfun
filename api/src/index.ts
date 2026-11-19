@@ -21,7 +21,7 @@ const CORS: Record<string, string> = {
 };
 
 function stub(env: Env) {
-  return env.INDEXER.get(env.INDEXER.idFromName(`main-${env.CHAIN_ID}`));
+  return env.INDEXER.get(env.INDEXER.idFromName(`main-${env.CHAIN_ID}-${env.FACTORY.slice(2, 10).toLowerCase()}-2`));
 }
 
 export default {

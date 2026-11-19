@@ -13,7 +13,7 @@
   "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true },
   "vars": {
-    "RPC_URL": "https://mainnet.base.org",
+    "RPC_URL": "https://base-rpc.publicnode.com",
     "CHAIN_ID": "8453",
     "FACTORY": "0x736dE2DbC4468F8224c63a11355980fB33949387",
     "HOOK": "0x7fA1311D29603211365b34a35eEF99208f06A8CC",

@@ -108,7 +108,11 @@ export class Indexer extends DurableObject<Env> {
   sync(): Promise<void> {
     if (!this.syncing) {
       this.syncing = this.doSync()
-        .catch((e) => console.error("sync failed", e))
+        .then(() => this.setMeta("last_error", ""))
+        .catch((e) => {
+          console.error("sync failed", e);
+          this.setMeta("last_error", String(e).slice(0, 300));
+        })
         .finally(() => {
           this.syncing = null;
           this.lastSync = Date.now();
@@ -371,6 +375,7 @@ export class Indexer extends DurableObject<Env> {
       platformFeesEth: Number(c.pfees),
       volumeEth: Number(c.volume),
       trades: Number(c.trades),
+      lastError: this.meta("last_error") || undefined,
     };
   }
 
