@@ -8,6 +8,9 @@ import type { Token } from "@/lib/api";
 import { ADDR, chain, DEPLOYED, snipeBpsAt } from "@/lib/config";
 import { fmtCompact, fmtEth } from "@/lib/format";
 import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
+import { TokenAvatar } from "./TokenAvatar";
+
+const ETH_LOGO = "https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg";
 
 function useDebounced<T>(v: T, ms = 350) {
   const [d, setD] = useState(v);
@@ -125,101 +128,98 @@ export function TradePanel({ token }: { token: Token }) {
     }
   }
 
-  const outLabel = quote.data
-    ? side === "buy"
-      ? `${fmtCompact(Number(formatEther(quote.data.out)))} ${token.symbol}`
-      : fmtEth(Number(formatEther(quote.data.out)))
-    : quote.isFetching
-      ? "…"
-      : "–";
-
+  const payEth = side === "buy";
+  const outNum = quote.data ? Number(formatEther(quote.data.out)) : 0;
+  const outText = quote.data
+    ? payEth ? fmtCompact(outNum) : outNum.toLocaleString(undefined, { maximumFractionDigits: 6 })
+    : quote.isFetching ? "…" : "0";
+  const label = !DEPLOYED
+    ? "Swaps open soon"
+    : busy ?? (!address ? "Connect wallet" : amountIn === 0n ? "Enter an amount" : insufficient ? `Not enough ${payEth ? "ETH" : token.symbol}` : "Swap");
+  const pill = (eth: boolean) => (
+    <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-panel-2 py-1 pl-1 pr-3 text-sm font-medium">
+      {eth ? <img src={ETH_LOGO} alt="" className="h-6 w-6 rounded-full" /> : <TokenAvatar src={token.image} symbol={token.symbol} size={24} />}
+      {eth ? "ETH" : token.symbol}
+    </span>
+  );
   return (
-    <div className="rounded-2xl border border-line bg-panel p-4">
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-bg p-1">
-        {(["buy", "sell"] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => {
-              setSide(s);
-              setAmount("");
+    <div className="rounded-3xl border border-line bg-panel p-2">
+      <div className="flex items-center justify-between px-3 py-2">
+        <span className="text-sm font-medium">Swap</span>
+        <label className="flex items-center gap-1.5 text-xs text-dim">
+          Slippage
+          <select value={slippage} onChange={(e) => setSlippage(Number(e.target.value))} className="rounded-md border border-line bg-bg px-1.5 py-0.5 text-fg outline-none">
+            {[1, 3, 5, 10, 20].map((v) => (
+              <option key={v} value={v}>{v}%</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="rounded-2xl border border-transparent bg-bg/70 p-4 focus-within:border-line-2">
+        <p className="text-xs text-dim">You pay</p>
+        <div className="mt-2 flex items-center gap-3">
+          <input
+            value={amount}
+            onChange={(e) => {
               setMsg(null);
+              setAmount(e.target.value.replace(/[^0-9.]/g, ""));
             }}
-            className={`h-9 rounded-lg text-sm font-semibold capitalize transition-colors ${
-              side === s ? (s === "buy" ? "bg-accent text-accent-ink" : "bg-down text-white") : "text-muted hover:text-fg"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4 flex items-baseline justify-between text-xs text-dim">
-        <span>Amount</span>
-        {address && (
-          <button onClick={() => preset(side === "buy" ? formatEther(balance) : "100")} className="font-mono hover:text-fg">
-            bal {side === "buy" ? fmtEth(Number(formatEther(balance))) : `${fmtCompact(Number(formatEther(balance)))} ${token.symbol}`}
-          </button>
-        )}
-      </div>
-      <div className="relative mt-1.5">
-        <input
-          type="number"
-          inputMode="decimal"
-          min="0"
-          step="any"
-          value={amount}
-          onChange={(e) => {
-            setAmount(e.target.value);
-            setMsg(null);
-          }}
-          placeholder="0.0"
-          className="h-12 w-full rounded-xl border border-line bg-bg px-3 pr-20 font-mono text-lg outline-none focus:border-accent/50"
-        />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-sm text-muted">{side === "buy" ? "ETH" : token.symbol}</span>
-      </div>
-      <div className="mt-2 grid grid-cols-4 gap-1.5">
-        {presets.map((p) => (
-          <button key={p} onClick={() => preset(p)} className="rounded-lg border border-line py-1.5 font-mono text-xs text-muted hover:border-accent/40 hover:text-fg">
-            {side === "buy" ? p : `${p}%`}
-          </button>
-        ))}
-      </div>
-
-      <dl className="mt-4 space-y-1.5 font-mono text-xs">
-        <div className="flex justify-between"><dt className="text-dim">You receive</dt><dd>{outLabel}</dd></div>
-        <div className="flex justify-between">
-          <dt className="text-dim">Fee</dt>
-          <dd className={snipeBps && side === "buy" ? "text-warn" : ""}>{feePct.toFixed(2)}%{snipeBps && side === "buy" ? " (anti-snipe)" : ""}</dd>
+            placeholder="0"
+            inputMode="decimal"
+            className="min-w-0 flex-1 bg-transparent text-4xl outline-none placeholder:text-dim"
+          />
+          {pill(payEth)}
         </div>
-        <div className="flex items-center justify-between">
-          <dt className="text-dim">Max slippage</dt>
-          <dd className="flex gap-1">
-            {[1, 5, 10, 20].map((s) => (
-              <button key={s} onClick={() => setSlippage(s)} className={`rounded px-1.5 ${slippage === s ? "bg-panel-2 text-fg" : "text-dim hover:text-fg"}`}>
-                {s}%
+        <div className="mt-3 flex items-center justify-between gap-2 text-xs text-dim">
+          <div className="flex gap-1">
+            {presets.map((p) => (
+              <button key={p} onClick={() => preset(p)} className="rounded-md border border-line px-1.5 py-0.5 hover:text-fg">
+                {payEth ? p : p === "100" ? "Max" : `${p}%`}
               </button>
             ))}
-          </dd>
+          </div>
+          {address && (
+            <span className="truncate font-mono">
+              Balance {payEth ? fmtEth(Number(formatEther(balance))) : fmtCompact(Number(formatEther(balance)))}
+            </span>
+          )}
         </div>
-      </dl>
-
+      </div>
+      <div className="relative z-10 -my-3.5 flex justify-center">
+        <button
+          aria-label="Switch direction"
+          onClick={() => {
+            setSide(payEth ? "sell" : "buy");
+            setAmount("");
+            setMsg(null);
+          }}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border-4 border-panel bg-panel-2 text-lg text-muted transition-colors hover:text-accent"
+        >
+          ↓
+        </button>
+      </div>
+      <div className="rounded-2xl bg-bg/70 p-4">
+        <p className="text-xs text-dim">You receive</p>
+        <div className="mt-2 flex items-center gap-3">
+          <p className="min-w-0 flex-1 truncate text-4xl text-fg/90">{outText}</p>
+          {pill(!payEth)}
+        </div>
+      </div>
+      <div className="space-y-1.5 px-3 py-3 text-xs">
+        <div className="flex justify-between text-muted"><span>Trade fee</span><span>{feePct}%</span></div>
+        <div className="flex justify-between text-muted"><span>Max slippage</span><span>{slippage}%</span></div>
+        {snipeBps > 0 && payEth && (
+          <p className="rounded-lg border border-warn/30 bg-warn/10 px-2.5 py-1.5 text-warn">Anti-snipe active: buys pay an extra {snipeBps / 100}% right now.</p>
+        )}
+      </div>
       <button
-        onClick={submit}
-        disabled={!DEPLOYED || amountIn === 0n || !!busy || insufficient || (quote.isError && !!address)}
-        className={`mt-4 h-11 w-full rounded-xl text-sm font-semibold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${
-          side === "buy" ? "bg-accent text-accent-ink" : "bg-down text-white"
-        }`}
+        onClick={() => (!address ? ensureWallet().catch(() => {}) : submit())}
+        disabled={!DEPLOYED || !!busy || (!!address && (amountIn === 0n || insufficient))}
+        className="h-14 w-full rounded-2xl bg-accent text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
       >
-        {busy ??
-          (!address
-            ? "Connect wallet"
-            : insufficient
-              ? "Insufficient balance"
-              : quote.isError
-                ? "Amount too large for pool"
-                : `${side === "buy" ? "Buy" : "Sell"} ${token.symbol}`)}
+        {label}
       </button>
-      {msg && <p className={`mt-3 break-words text-xs ${msg.ok ? "text-up" : "text-down"}`}>{msg.text}</p>}
+      {msg && <p className={`px-3 pt-2 text-sm ${msg.ok ? "text-up" : "text-down"}`}>{msg.text}</p>}
     </div>
   );
 }

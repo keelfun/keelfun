@@ -9,6 +9,11 @@ import { BRIDGE_CHAINS, wagmiConfig } from "@/lib/wagmi";
 
 type Cid = (typeof wagmiConfig)["chains"][number]["id"];
 const RELAY = "https://api.relay.link";
+const SLUG: Record<number, string> = { 1: "ethereum", 42161: "arbitrum", 10: "optimism", 59144: "linea", 8453: "base", 84532: "base" };
+const logo = (id: number) => `https://icons.llamao.fi/icons/chains/rsz_${SLUG[id] ?? "base"}.jpg`;
+const Logo = ({ id, size = 20 }: { id: number; size?: number }) => (
+  <img src={logo(id)} alt="" width={size} height={size} className="shrink-0 rounded-full" style={{ width: size, height: size }} />
+);
 const ZERO = "0x0000000000000000000000000000000000000000";
 const DEAD = "0x000000000000000000000000000000000000dEaD";
 
@@ -148,14 +153,15 @@ export default function BridgePage() {
           <p className="mb-2 text-xs text-dim">{dir === "in" ? "From" : "To"} chain</p>
           <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto">
             {BRIDGE_CHAINS.map((c) => (
-              <button key={c.id} onClick={() => setOther(c.id)} className={`shrink-0 rounded-lg border px-3 py-1.5 text-sm ${other === c.id ? "border-accent/60 bg-accent/10 text-fg" : "border-line text-muted hover:text-fg"}`}>
+              <button key={c.id} onClick={() => setOther(c.id)} className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-1.5 text-sm ${other === c.id ? "border-accent/60 bg-accent/10 text-fg" : "border-line text-muted hover:text-fg"}`}>
+                <Logo id={c.id} />
                 {c.name}
               </button>
             ))}
           </div>
           <div className="rounded-xl border border-line bg-bg/60 p-4">
             <div className="flex items-center justify-between text-xs text-dim">
-              <span>From {fromName}</span>
+              <span className="flex items-center gap-1.5"><Logo id={from} size={16} />From {fromName}</span>
               {balEth != null && (
                 <button onClick={() => setAmount(String(Math.max(0, balEth * 0.98).toFixed(6)))} className="hover:text-fg">
                   Balance {num(String(balEth), 5)} ETH · Max
@@ -164,15 +170,15 @@ export default function BridgePage() {
             </div>
             <div className="mt-2 flex items-center gap-3">
               <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0" inputMode="decimal" className="min-w-0 flex-1 bg-transparent font-serif text-4xl outline-none placeholder:text-dim" />
-              <span className="rounded-lg border border-line px-3 py-1.5 text-sm">ETH</span>
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-panel-2 py-1 pl-1 pr-3 text-sm font-medium"><Logo id={1} size={24} />ETH</span>
             </div>
           </div>
           <div className="my-2 text-center text-dim">↓</div>
           <div className="rounded-xl border border-line bg-bg/60 p-4">
-            <p className="text-xs text-dim">To {destName}</p>
+            <p className="flex items-center gap-1.5 text-xs text-dim"><Logo id={dest} size={16} />To {destName}</p>
             <div className="mt-2 flex items-center gap-3">
               <p className="min-w-0 flex-1 truncate font-serif text-4xl text-fg/90">{quote ? num(quote.details?.currencyOut?.amountFormatted) : "0"}</p>
-              <span className="rounded-lg border border-line px-3 py-1.5 text-sm">ETH</span>
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-panel-2 py-1 pl-1 pr-3 text-sm font-medium"><Logo id={1} size={24} />ETH</span>
             </div>
           </div>
           <label className="mt-4 block text-xs text-dim">
@@ -198,7 +204,7 @@ export default function BridgePage() {
         </div>
         <div className="space-y-4">
           <div className="rounded-2xl border border-line bg-panel p-4 text-sm">
-            <p className="font-medium">{chain.name} in your wallet</p>
+            <p className="flex items-center gap-2 font-medium"><Logo id={chain.id} />{chain.name} in your wallet</p>
             <p className="mt-1 text-muted">Most wallets already have {chain.name}. If yours doesn&apos;t, add it with these details.</p>
             <dl className="mt-3 space-y-1.5 font-mono text-xs">
               <div className="flex justify-between gap-3"><dt className="text-dim">RPC</dt><dd className="truncate">{RPC_URL}</dd></div>
