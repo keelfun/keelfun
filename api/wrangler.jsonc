@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keel-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "INDEXER", "class_name": "Indexer" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Indexer"] }],
+  "triggers": { "crons": ["* * * * *"] },
+  "observability": { "enabled": true },
+  "vars": {
+    "RPC_URL": "https://mainnet.base.org",
+    "CHAIN_ID": "8453",
+    "FACTORY": "0x0000000000000000000000000000000000000000",
+    "HOOK": "0x0000000000000000000000000000000000000000",
+    "POOL_MANAGER": "0x498581ff718922c3f8e6a244956af099b2652b2b",
+    "START_BLOCK": "0",
+    "START_TICK": "200200"
+  }
+}
