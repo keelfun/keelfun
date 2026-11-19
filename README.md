@@ -1,116 +1,25 @@
-<p align="center">
-  <img src="docs/images/logo.svg" width="120" alt="Volley" />
-</p>
+<p align="center"><img src="web/public/icon.png" width="96" alt="Keel" /></p>
+<h1 align="center">Keel</h1>
+<p align="center">Fair-launch token launchpad on Base, built on Uniswap v4. <a href="https://keelfun.app">keelfun.app</a> · <a href="https://x.com/Keelfunxyz">@Keelfunxyz</a></p>
 
-<h1 align="center">Volley</h1>
+## What it does
+- One transaction launches a token: the full supply goes into a Uniswap v4 pool, and the LP is locked forever.
+- Supply tiers of 1B / 10B / 100B / 1T, and trade fees of 1 / 2 / 3 / 5 / 10%.
+- Fees go to the creator, to holders (claimable ETH), or split across up to 4 wallets.
+- Optional anti-snipe: a 90% tax that decays to 0 over 60 seconds. Optional tax-free first buy.
+- Swap any Base token (routed via Relay), bridge ETH (Relay), Builders programme, and a Buyback dashboard.
 
-<p align="center">
-  Fair-launch token launchpad on <b>Robinhood Chain</b>, built on <b>Uniswap v4</b>.<br/>
-  Launch a token in one tx. Liquidity from block one. LP locked forever.
-</p>
-
-<p align="center">
-  <a href="https://volleyfun.org">volleyfun.org</a> ·
-  <a href="https://x.com/_volleyFun">X</a> ·
-  <a href="https://volleyfun.org/docs/">Docs</a>
-</p>
-
-<p align="center">
-  <img src="docs/images/desktop-home.png" alt="Volley discover page" />
-</p>
-
-## How it works
-
-- **One-tx launch**: the factory deploys a fixed-supply ERC-20 (1,000,000,000 tokens, no mint function), creates a native ETH / token Uniswap v4 pool and seeds it with 100% of the supply. No presale, no team allocation.
-- **Locked liquidity**: the LP position is held by the factory contract, which has no function to remove it, so liquidity can never be pulled.
-- **Creator first buy**: the creator can buy in the same launch tx, before anyone else and with no anti-snipe tax.
-- **Anti-snipe window**: the first 3 seconds after launch carry a decaying tax that goes to the platform.
-- **Fees**: every trade pays a small fee, split between the platform and (optionally) the creator. Creators claim their rewards any time.
-- **Graduation**: a token graduates once 73.86% of the supply has been bought from the pool.
-
-| Fee | Rate |
-| --- | --- |
-| Platform | 0.75% |
-| Creator rewards (optional) | 0.25% |
-
-| Seconds after launch | Anti-snipe tax |
-| --- | --- |
-| 0 | 99.00% |
-| 1 | 24.81% |
-| 2 | 5.19% |
-| 3+ | 0% |
-
-## Screenshots
-
-<p align="center">
-  <img src="docs/images/desktop-token.png" alt="Token page with chart and trade panel" />
-</p>
-
-<p align="center">
-  <img src="docs/images/desktop-launch.png" alt="Launch form" />
-</p>
-
-<p align="center">
-  <img src="docs/images/mobile-home.png" width="30%" alt="Mobile discover" />
-  <img src="docs/images/mobile-token.png" width="30%" alt="Mobile token page" />
-  <img src="docs/images/mobile-launch.png" width="30%" alt="Mobile launch" />
-</p>
-
-## Deployments
-
-### Robinhood Chain testnet (chain id 46630)
-
+## Base mainnet deployment
 | Contract | Address |
-| --- | --- |
-| LaunchFactory | [`0x6E9055a022BeC0F86cDcc5bD7AcB8A2847441d0E`](https://explorer.testnet.chain.robinhood.com/address/0x6E9055a022BeC0F86cDcc5bD7AcB8A2847441d0E) |
-| LaunchHook | [`0xF44a38e9a6F1d6a160892beaB29455D7ef5ae8CC`](https://explorer.testnet.chain.robinhood.com/address/0xF44a38e9a6F1d6a160892beaB29455D7ef5ae8CC) |
-| LaunchRouter | [`0xF4020916B173000A9FC0c3BcD06Cd1a2DEbEC3bA`](https://explorer.testnet.chain.robinhood.com/address/0xF4020916B173000A9FC0c3BcD06Cd1a2DEbEC3bA) |
-| Uniswap v4 PoolManager | [`0x8366a39CC670B4001A1121B8F6A443A643e40951`](https://explorer.testnet.chain.robinhood.com/address/0x8366a39CC670B4001A1121B8F6A443A643e40951) |
+|---|---|
+| LaunchFactory | `0x736dE2DbC4468F8224c63a11355980fB33949387` |
+| LaunchHook | `0x7fA1311D29603211365b34a35eEF99208f06A8CC` |
+| LaunchRouter | `0x7c3Afc67Ce06C2bBFEfB580243F6aD01948C0473` |
+| PoolManager (Uniswap) | `0x498581fF718922c3f8e6A244956aF099B2652b2b` |
 
-Mainnet: not deployed yet. The contracts are unaudited.
+The contracts are unaudited.
 
-## Architecture
-
-```
-contracts/   Solidity (Foundry): LaunchToken, LaunchFactory, LaunchHook (fees, anti-snipe,
-             graduation), LaunchRouter (buy/sell/quotes on top of the v4 PoolManager)
-api/         Cloudflare Worker + Durable Object (SQLite) indexer: launches, trades, holders,
-             OHLC candles, rankings, portfolio, image/metadata uploads
-web/         Next.js static frontend (wagmi + viem): discover, launch, token page with chart
-             and trade panel, portfolio, docs
-scripts/     local chain setup and smoke tests
-```
-
-## Development
-
-Requirements: [Foundry](https://getfoundry.sh), Node.js 22+.
-
-```bash
-# contracts: tests run against a fork of Robinhood Chain testnet
-cd contracts && forge test
-
-# local stack: anvil + launchpad contracts, writes api/.dev.vars and web/.env.local
-anvil --block-time 1
-./scripts/local-chain.sh
-./scripts/local-smoke.sh          # optional: launch a token and trade it
-
-cd api && npm install && npm run dev    # indexer on :8787
-cd web && npm install && npm run dev    # frontend on :3000
-```
-
-### Deploy
-
-```bash
-# contracts
-cd contracts && forge script script/Deploy.s.sol \
-  --rpc-url https://rpc.testnet.chain.robinhood.com --broadcast --slow --private-key <key>
-
-# api: set FACTORY, HOOK and START_BLOCK in api/wrangler.jsonc
-cd api && npx wrangler deploy
-
-# web: static export to web/out, served from Cloudflare Pages
-cd web && NEXT_PUBLIC_CHAIN_ID=46630 NEXT_PUBLIC_API_URL=https://api.volleyfun.org \
-  NEXT_PUBLIC_FACTORY=... NEXT_PUBLIC_HOOK=... NEXT_PUBLIC_ROUTER=... npm run build
-npx wrangler pages deploy out --project-name volley
-```
-
+## Layout
+- `contracts/`: Foundry (Solidity 0.8.26). Run `forge test`. Deploy with `forge script script/Deploy.s.sol --rpc-url <rpc> --broadcast`.
+- `api/`: Cloudflare Worker + Durable Object indexer (`keel-api`, api.keelfun.app). Run `npx wrangler deploy`.
+- `web/`: Next.js static export served by the `keel-web` Worker (keelfun.app). Build with `npm run build`, then `npx wrangler deploy`.
