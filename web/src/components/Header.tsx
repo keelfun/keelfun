@@ -8,7 +8,11 @@ import { Socials } from "./Socials";
 const NAV = [
   { href: "/", label: "Discover" },
   { href: "/launch/", label: "Launch" },
+  { href: "/swap/", label: "Swap" },
   { href: "/portfolio/", label: "Portfolio" },
+  { href: "/buyback/", label: "Buyback" },
+  { href: "/bridge/", label: "Bridge" },
+  { href: "/builders/", label: "Builders" },
   { href: "/docs/", label: "Docs" },
 ];
 
@@ -34,12 +38,12 @@ export function Header() {
           <Logo className="h-7 w-7" />
           <span className="text-[15px] font-semibold tracking-tight">{BRAND}</span>
         </Link>
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden items-center gap-0.5 lg:flex">
           {NAV.map((n) => (
             <Link
               key={n.href}
               href={n.href}
-              className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${active(n.href) ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}
+              className={`rounded-lg px-2.5 py-1.5 text-sm transition-colors ${active(n.href) ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}
             >
               {n.label}
             </Link>
@@ -60,7 +64,7 @@ export function Header() {
           <ConnectButton />
         </div>
       </div>
-      <nav className="no-scrollbar flex gap-1 overflow-x-auto border-t border-line px-3 py-1.5 md:hidden">
+      <nav className="no-scrollbar flex gap-1 overflow-x-auto border-t border-line px-3 py-1.5 lg:hidden">
         {NAV.map((n) => (
           <Link
             key={n.href}

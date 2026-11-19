@@ -74,7 +74,7 @@ export default function Home() {
       )}
 
       <h2 id="markets" className="mb-3 scroll-mt-28 font-serif text-4xl">Markets</h2>
-      <div className="sticky top-[97px] z-30 -mx-4 mb-4 flex flex-col gap-3 border-b border-line bg-bg/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:top-14 md:flex-row md:items-center">
+      <div className="sticky top-[97px] z-30 -mx-4 mb-4 flex flex-col gap-3 border-b border-line bg-bg/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:top-14 md:flex-row md:items-center">
         <div className="no-scrollbar flex gap-1 overflow-x-auto">
           {TABS.map((t) => (
             <button

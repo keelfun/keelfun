@@ -59,7 +59,7 @@ export type Trade = {
 
 export type Holder = { holder: string; amount: number; pct: number; label: "pool" | "burn" | "creator" | null };
 export type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
-export type Stats = { chainId: number; ethUsd: number; tokens: number; volumeEth: number; trades: number; head: number; cursor: number };
+export type Stats = { chainId: number; ethUsd: number; tokens: number; volumeEth: number; trades: number; head: number; cursor: number; platformFeesEth?: number };
 export type Portfolio = {
   holdings: { token: Token; amount: number; valueEth: number; valueUsd: number }[];
   created: Token[];

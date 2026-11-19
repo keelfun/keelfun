@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { parseEventLogs } from "viem";
+import { parseEventLogs, verifyMessage } from "viem";
 import { launchFactoryAbi, launchHookAbi, launchTokenAbi } from "./abis";
 import { Rpc, type RpcLog } from "./rpc";
 import type { Env } from "./index";
@@ -71,9 +71,16 @@ export class Indexer extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS balances_holder ON balances(holder);
       CREATE TABLE IF NOT EXISTS uploads (id TEXT PRIMARY KEY, mime TEXT, data BLOB, created INTEGER);
       CREATE TABLE IF NOT EXISTS metadata (id TEXT PRIMARY KEY, body TEXT, created INTEGER);
+      CREATE TABLE IF NOT EXISTS builders (
+        code TEXT PRIMARY KEY, name TEXT, url TEXT, kind TEXT, description TEXT, payout TEXT, signature TEXT,
+        approved INTEGER DEFAULT 0, created INTEGER
+      );
     `);
     try {
       this.sql.exec("ALTER TABLE tokens ADD COLUMN meta_tries INTEGER DEFAULT 0");
+    } catch {}
+    try {
+      this.sql.exec("ALTER TABLE tokens ADD COLUMN builder TEXT");
     } catch {}
   }
 
@@ -317,6 +324,7 @@ export class Indexer extends DurableObject<Env> {
         if (parts[0] === "sync") return await this.sync().then(() => json({ ok: true }));
         if (parts[0] === "upload") return await this.upload(req, url);
         if (parts[0] === "metadata") return await this.saveMetadata(req, url);
+        if (parts[0] === "builders") return await this.registerBuilder(req);
         return json({ error: "not found" }, 404);
       }
       switch (parts[0]) {
@@ -328,6 +336,8 @@ export class Indexer extends DurableObject<Env> {
           return this.tokenRoute(lc(parts[1]), parts[2], url.searchParams);
         case "portfolio":
           return json(this.portfolio(lc(parts[1] ?? "")));
+        case "builders":
+          return json(this.builders());
         case "images":
           return this.image(parts[1] ?? "");
         case "metadata": {
@@ -348,7 +358,7 @@ export class Indexer extends DurableObject<Env> {
 
   private stats() {
     const c = this.sql.exec(
-      "SELECT COUNT(*) AS tokens, COALESCE(SUM(volume), 0) AS volume, COALESCE(SUM(trade_count), 0) AS trades FROM tokens",
+      "SELECT COUNT(*) AS tokens, COALESCE(SUM(volume), 0) AS volume, COALESCE(SUM(trade_count), 0) AS trades, COALESCE(SUM(platform_fees), 0) AS pfees FROM tokens",
     ).one();
     return {
       chainId: Number(this.env.CHAIN_ID),
@@ -358,6 +368,7 @@ export class Indexer extends DurableObject<Env> {
       head: Number(this.meta("head") ?? 0),
       ethUsd: this.ethUsd(),
       tokens: Number(c.tokens),
+      platformFeesEth: Number(c.pfees),
       volumeEth: Number(c.volume),
       trades: Number(c.trades),
     };
@@ -567,13 +578,66 @@ export class Indexer extends DurableObject<Env> {
     });
   }
 
+  private builders() {
+    this.sql.exec(
+      `UPDATE tokens SET builder = (SELECT json_extract(body, '$.builder') FROM metadata WHERE metadata.id = substr(tokens.metadata_uri, -64))
+       WHERE builder IS NULL AND metadata_uri LIKE '%/metadata/%'`,
+    );
+    const rows = this.sql
+      .exec(
+        `SELECT b.code, b.name, b.url, b.kind, b.description, b.approved, b.created,
+           COUNT(t.address) AS tokens, COALESCE(SUM(t.volume), 0) AS volume, COALESCE(SUM(t.platform_fees), 0) AS pfees
+         FROM builders b LEFT JOIN tokens t ON t.builder = b.code
+         GROUP BY b.code ORDER BY volume DESC, tokens DESC, b.created ASC LIMIT 200`,
+      )
+      .toArray();
+    return {
+      builders: rows.map((r) => ({
+        code: r.code, name: r.name, url: r.url, kind: r.kind, description: r.description, approved: Boolean(r.approved),
+        tokens: Number(r.tokens), volumeEth: Number(r.volume), shareEth: Number(r.pfees) * BUILDER_SHARE,
+      })),
+      ethUsd: this.ethUsd(),
+    };
+  }
+
+  private async registerBuilder(req: Request) {
+    const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!b) return json({ error: "invalid json" }, 400);
+    const s = (k: string, max: number) => (typeof b[k] === "string" ? (b[k] as string).trim().slice(0, max) : "");
+    const code = s("code", 24).toLowerCase();
+    const payout = s("payout", 42);
+    const name = s("name", 40);
+    if (!BUILDER_CODE.test(code)) return json({ error: "Code: 3-24 letters, numbers or dashes" }, 400);
+    if (!/^0x[0-9a-fA-F]{40}$/.test(payout)) return json({ error: "Invalid payout wallet" }, 400);
+    if (!name) return json({ error: "Name your product" }, 400);
+    const ok = await verifyMessage({
+      address: payout as `0x${string}`,
+      message: builderMessage(code, payout),
+      signature: s("signature", 300) as `0x${string}`,
+    }).catch(() => false);
+    if (!ok) return json({ error: "Signature doesn't match the payout wallet" }, 400);
+    const ex = this.sql.exec("SELECT payout FROM builders WHERE code = ?", code).toArray()[0];
+    if (ex && lc(String(ex.payout)) !== lc(payout)) return json({ error: "That code is taken" }, 409);
+    this.sql.exec(
+      `INSERT INTO builders (code, name, url, kind, description, payout, signature, approved, created) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+       ON CONFLICT(code) DO UPDATE SET name = excluded.name, url = excluded.url, kind = excluded.kind,
+         description = excluded.description, signature = excluded.signature`,
+      code, name, str(s("url", 200)), str(s("kind", 24)), str(s("description", 280)), lc(payout), s("signature", 300), Date.now(),
+    );
+    return json({ ok: true, code });
+  }
+
   private async saveMetadata(req: Request, url: URL) {
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body) return json({ error: "invalid json" }, 400);
     const clean: Record<string, string> = {};
-    for (const k of ["description", "image", "website", "x", "telegram", "discord"]) {
+    for (const k of ["description", "image", "website", "x", "telegram", "discord", "builder"]) {
       const v = body[k];
       if (typeof v === "string" && v.trim()) clean[k] = v.trim().slice(0, k === "description" ? 600 : 300);
+    }
+    if (clean.builder) {
+      clean.builder = clean.builder.toLowerCase();
+      if (!BUILDER_CODE.test(clean.builder)) delete clean.builder;
     }
     const text = JSON.stringify(clean);
     const id = await sha256(new TextEncoder().encode(text));
@@ -616,4 +680,11 @@ function safeParseArr(s: string): unknown[] {
   } catch {
     return [];
   }
+}
+
+const BUILDER_CODE = /^[a-z0-9-]{3,24}$/;
+const BUILDER_SHARE = 0.25;
+
+export function builderMessage(code: string, payout: string) {
+  return `Keel Builders\n\nCode: ${code}\nPayout wallet: ${payout.toLowerCase()}\n\nI accept the Keel Builders terms. This signature costs no gas and moves no funds.`;
 }

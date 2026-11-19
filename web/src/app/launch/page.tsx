@@ -141,6 +141,10 @@ export default function LaunchPage() {
       }
       setStep("Saving metadata…");
       const meta: Record<string, string> = { description, image, website, x, telegram, discord };
+      const qs = new URLSearchParams(window.location.search).get("ref");
+      if (qs) localStorage.setItem("keel-ref", qs);
+      const builder = (qs || localStorage.getItem("keel-ref") || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 24);
+      if (builder.length >= 3) meta.builder = builder;
       const uri = await saveMetadata(Object.fromEntries(Object.entries(meta).filter(([, v]) => v.trim())));
       const recipients =
         route === "holders" ? [] : route === "creator" ? [account] : splits.map((s) => s.address as `0x${string}`);

@@ -4,14 +4,15 @@ import { Logo } from "./Header";
 import { Socials } from "./Socials";
 
 const COLS: [string, [string, string][]][] = [
-  [BRAND, [["Discover", "/"], ["Launch a token", "/launch/"], ["Portfolio", "/portfolio/"]]],
+  [BRAND, [["Discover", "/"], ["Launch a token", "/launch/"], ["Swap", "/swap/"], ["Bridge", "/bridge/"], ["Portfolio", "/portfolio/"], ["Buyback", "/buyback/"]]],
   ["Learn", [[`How ${BRAND} works`, "/docs/"], ["Fees, explained", "/docs/"], ["Holder rewards", "/docs/"]]],
+  ["Build", [[`Build on ${BRAND}`, "/builders/"], ["Builder programme", "/builders/#join"]]],
 ];
 
 export function Footer() {
   return (
     <footer className="border-t border-line">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:grid-cols-[1.4fr_1fr_1fr] sm:px-6">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] sm:px-6">
         <div>
           <div className="flex items-center gap-2">
             <Logo className="h-6 w-6" />
