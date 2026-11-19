@@ -27,41 +27,43 @@ export default function Home() {
 
   return (
     <div>
-      <section className="relative -mx-4 overflow-hidden px-4 pb-8 pt-10 sm:-mx-6 sm:px-6 sm:pt-14">
-        <div className="grid-glow pointer-events-none absolute inset-0" />
-        <div className="relative max-w-2xl">
-          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-line bg-panel px-3 py-1 font-mono text-[11px] text-muted">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" /> Uniswap v4 · {chain.name}
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
-            Launch a token in one tx.
-            <br />
-            <span className="text-gradient">Liquidity from block one.</span>
+      <section className="relative left-1/2 -mt-px mb-8 w-screen -translate-x-1/2 overflow-hidden">
+        <img src="/art/hero.webp" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-[70%_40%] opacity-90" />
+        <div className="absolute inset-0 bg-gradient-to-r from-bg/85 via-bg/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-bg/30 via-transparent to-bg" />
+        <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-16 sm:px-6 sm:pb-14 sm:pt-28">
+          <h1 className="max-w-3xl font-serif text-[44px] leading-[1.02] tracking-tight sm:text-7xl">
+            The steady way to <em className="text-[#bcd3ff]">launch</em> on Base
           </h1>
-          <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
-            Every {BRAND} token gets a fixed supply, a v4 pool seeded with 100% of tokens, permanently locked liquidity and
-            optional 60-second anti-snipe. Fees go to you, your holders or a split.
+          <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-fg/80 sm:text-base">
+            One transaction, a Uniswap v4 pool from block one and liquidity locked forever. Fees go to you, your holders or a
+            split.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/launch/" className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink hover:brightness-110">
+          <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <Link href="/launch/" className="rounded-lg bg-fg px-5 py-2.5 text-sm font-medium text-bg hover:bg-white">
               Launch a token
             </Link>
-            <Link href="/docs/" className="rounded-xl border border-line-2 px-5 py-2.5 text-sm text-fg hover:bg-panel-2">
-              How it works
+            <a href="#markets" className="text-sm text-fg/90 underline-offset-4 hover:underline">
+              See what&apos;s trading
+            </a>
+            <Link href="/docs/" className="text-sm text-fg/90 underline-offset-4 hover:underline">
+              How {BRAND} works
             </Link>
           </div>
-        </div>
-        <div className="relative mt-8 grid max-w-xl grid-cols-3 gap-3 font-mono">
-          {[
-            ["Tokens", stats ? fmtCompact(stats.tokens, 0) : "–"],
-            ["Volume", stats ? fmtValue(stats.volumeEth, stats.ethUsd) : "–"],
-            ["Trades", stats ? fmtCompact(stats.trades, 1) : "–"],
-          ].map(([k, v]) => (
-            <div key={k} className="rounded-xl border border-line bg-panel/80 px-3 py-2.5">
-              <p className="text-[11px] text-dim">{k}</p>
-              <p className="text-sm sm:text-base">{v}</p>
-            </div>
-          ))}
+          <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-6 sm:mt-20 lg:grid-cols-4">
+            {[
+              ["Tokens launched", stats ? fmtCompact(stats.tokens, 0) : "0", "fixed supply, no presale"],
+              ["Volume", stats ? fmtValue(stats.volumeEth, stats.ethUsd) : "$0", "settled in v4 pools"],
+              ["Trades", stats ? fmtCompact(stats.trades, 1) : "0", "on " + chain.name],
+              ["LP locked", "100%", "forever, from block one"],
+            ].map(([k, v, sub]) => (
+              <div key={k} className="border-t border-fg/15 pt-3">
+                <p className="text-xs text-fg/60">{k}</p>
+                <p className="mt-1 font-serif text-4xl sm:text-5xl">{v}</p>
+                <p className="mt-1 text-xs text-fg/45">{sub}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -71,6 +73,7 @@ export default function Home() {
         </p>
       )}
 
+      <h2 id="markets" className="mb-3 scroll-mt-28 font-serif text-4xl">Markets</h2>
       <div className="sticky top-[97px] z-30 -mx-4 mb-4 flex flex-col gap-3 border-b border-line bg-bg/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 md:top-14 md:flex-row md:items-center">
         <div className="no-scrollbar flex gap-1 overflow-x-auto">
           {TABS.map((t) => (
@@ -113,6 +116,23 @@ export default function Home() {
           </Link>
         </div>
       )}
+      <section className="relative left-1/2 mt-20 w-screen -translate-x-1/2 overflow-hidden">
+        <img src="/art/band.webp" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-[60%_55%] opacity-85" />
+        <div className="absolute inset-0 bg-gradient-to-b from-bg via-bg/20 to-bg" />
+        <div className="absolute inset-0 bg-gradient-to-r from-bg/85 via-bg/30 to-transparent" />
+        <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32">
+          <h2 className="max-w-xl font-serif text-4xl leading-tight sm:text-6xl">
+            Every token gets a <em className="text-[#bcd3ff]">keel</em>
+          </h2>
+          <p className="mt-4 max-w-md text-[15px] leading-relaxed text-fg/80">
+            Fixed supply, 100% of tokens in the pool, optional 60-second anti-snipe and fees that keep paying the people who
+            hold.
+          </p>
+          <Link href="/launch/" className="mt-7 inline-block rounded-lg bg-fg px-5 py-2.5 text-sm font-medium text-bg hover:bg-white">
+            Launch a token
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

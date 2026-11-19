@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { BRAND } from "@/lib/config";
@@ -8,6 +8,7 @@ import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const serif = Instrument_Serif({ variable: "--font-serif-face", subsets: ["latin"], weight: "400", style: ["normal", "italic"] });
 
 export const metadata: Metadata = {
   title: `${BRAND} — fair launches on Base`,
@@ -22,7 +23,7 @@ export const viewport: Viewport = { themeColor: "#05070d", width: "device-width"
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-dvh antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${serif.variable} min-h-dvh overflow-x-clip antialiased`}>
         <Providers>
           <Header />
           <main className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6">{children}</main>
