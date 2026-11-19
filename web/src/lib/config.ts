@@ -40,9 +40,9 @@ export const SOCIALS = {
 
 const zero = "0x0000000000000000000000000000000000000000";
 export const ADDR = {
-  factory: (process.env.NEXT_PUBLIC_FACTORY || zero) as Address,
-  hook: (process.env.NEXT_PUBLIC_HOOK || zero) as Address,
-  router: (process.env.NEXT_PUBLIC_ROUTER || zero) as Address,
+  factory: (process.env.NEXT_PUBLIC_FACTORY || (chainId === 8453 ? "0x736dE2DbC4468F8224c63a11355980fB33949387" : zero)) as Address,
+  hook: (process.env.NEXT_PUBLIC_HOOK || (chainId === 8453 ? "0x7fA1311D29603211365b34a35eEF99208f06A8CC" : zero)) as Address,
+  router: (process.env.NEXT_PUBLIC_ROUTER || (chainId === 8453 ? "0x7c3Afc67Ce06C2bBFEfB580243F6aD01948C0473" : zero)) as Address,
   poolManager: (process.env.NEXT_PUBLIC_POOL_MANAGER || "0x498581ff718922c3f8e6a244956af099b2652b2b") as Address,
 };
 export const DEPLOYED = ADDR.factory !== zero;
