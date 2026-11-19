@@ -50,7 +50,12 @@ export default function Home() {
               How {BRAND} works
             </Link>
           </div>
-          <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-6 sm:mt-20 lg:grid-cols-4">
+          {!DEPLOYED && (
+            <p className="mt-6 inline-flex items-center gap-2 rounded-full border border-warn/30 bg-bg/60 px-3 py-1 text-xs text-warn backdrop-blur">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-warn" /> Contracts go live on {chain.name} soon. Launching and trading open then.
+            </p>
+          )}
+          <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-6 sm:mt-16 lg:grid-cols-4">
             {[
               ["Tokens launched", stats ? fmtCompact(stats.tokens, 0) : "0", "fixed supply, no presale"],
               ["Volume", stats ? fmtValue(stats.volumeEth, stats.ethUsd) : "$0", "settled in v4 pools"],
@@ -67,13 +72,7 @@ export default function Home() {
         </div>
       </section>
 
-      {!DEPLOYED && (
-        <p className="mb-4 rounded-xl border border-warn/30 bg-warn/10 px-4 py-3 text-sm text-warn">
-          Contracts aren&apos;t deployed on this network yet. Launching and trading open once they are.
-        </p>
-      )}
-
-      <h2 id="markets" className="mb-3 scroll-mt-28 font-serif text-4xl">Markets</h2>
+      <h2 id="markets" className="mb-3 mt-4 scroll-mt-28 font-serif text-4xl sm:text-5xl">Markets</h2>
       <div className="sticky top-[97px] z-30 -mx-4 mb-4 flex flex-col gap-3 border-b border-line bg-bg/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:top-14 md:flex-row md:items-center">
         <div className="no-scrollbar flex gap-1 overflow-x-auto">
           {TABS.map((t) => (
@@ -116,7 +115,7 @@ export default function Home() {
           </Link>
         </div>
       )}
-      <section className="relative left-1/2 mt-20 w-screen -translate-x-1/2 overflow-hidden">
+      <section className="relative left-1/2 mt-12 w-screen -translate-x-1/2 overflow-hidden">
         <img src="/art/band.webp" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-[60%_55%] opacity-85" />
         <div className="absolute inset-0 bg-gradient-to-b from-bg via-bg/20 to-bg" />
         <div className="absolute inset-0 bg-gradient-to-r from-bg/85 via-bg/30 to-transparent" />

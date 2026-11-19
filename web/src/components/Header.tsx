@@ -64,7 +64,7 @@ export function Header() {
           <ConnectButton />
         </div>
       </div>
-      <nav className="no-scrollbar flex gap-1 overflow-x-auto border-t border-line px-3 py-1.5 lg:hidden">
+      <nav className="no-scrollbar flex gap-1 overflow-x-auto border-t border-line px-3 py-1.5 [mask-image:linear-gradient(to_right,black_85%,transparent)] lg:hidden">
         {NAV.map((n) => (
           <Link
             key={n.href}

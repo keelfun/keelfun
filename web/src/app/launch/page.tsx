@@ -5,6 +5,7 @@ import { useState } from "react";
 import { isAddress, parseEther, parseEventLogs } from "viem";
 import { useAccount, useBalance, useWriteContract } from "wagmi";
 import { launchFactoryAbi } from "@/lib/abis";
+import { Em, PageHero } from "@/components/PageHero";
 import { saveMetadata, uploadImage } from "@/lib/api";
 import { ADDR, chain, DEPLOYED, FEE_TIERS, SUPPLY_TIERS } from "@/lib/config";
 import { fmtEth } from "@/lib/format";
@@ -185,13 +186,13 @@ export default function LaunchPage() {
   const routeLabel = route === "holders" ? "Holders" : route === "creator" ? "You" : `${splits.length} wallets`;
 
   return (
-    <div className="mx-auto max-w-5xl py-8">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Launch a token</h1>
-      <p className="mt-2 text-sm text-muted">
-        One transaction on Base. Full supply goes into a Uniswap v4 pool, LP locked forever. No presale, no team allocation.
-      </p>
+    <div className="mx-auto max-w-5xl">
+      <PageHero
+        title={<>Launch a <Em>token</Em></>}
+        sub={`One transaction on ${chain.name}. The full supply goes into a Uniswap v4 pool and the LP is locked forever. No presale, no team allocation.`}
+      />
 
-      <form onSubmit={submit} className="mt-8 grid gap-6 lg:grid-cols-[1fr_340px]">
+      <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-4">
           <Section n={1} title="Identity" sub="Name, ticker, image and links">
             <div className="space-y-4">

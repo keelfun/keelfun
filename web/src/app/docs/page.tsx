@@ -1,3 +1,4 @@
+import { Em, PageHero } from "@/components/PageHero";
 import { ADDR, BRAND, chain, DEPLOYED, EXPLORER } from "@/lib/config";
 
 const SECTIONS: [string, string][] = [
@@ -35,12 +36,10 @@ export default function Docs() {
     ["Uniswap v4 PoolManager", ADDR.poolManager],
   ];
   return (
-    <div className="mx-auto max-w-3xl py-10">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">How {BRAND} works</h1>
-      <p className="mt-3 text-sm leading-relaxed text-muted">
-        {BRAND} is a fair-launch token launchpad on {chain.name}, built on Uniswap v4 hooks.
-      </p>
-      <div className="mt-8 space-y-3">
+    <div>
+      <PageHero title={<>How {BRAND} <Em>works</Em></>} sub={`${BRAND} is a fair-launch token launchpad on ${chain.name}, built on Uniswap v4 hooks.`} />
+      <div className="mx-auto max-w-3xl">
+      <div className="space-y-3">
         {SECTIONS.map(([h, p]) => (
           <section key={h} className="rounded-2xl border border-line bg-panel p-5">
             <h2 className="font-semibold">{h}</h2>
@@ -68,8 +67,11 @@ export default function Docs() {
         ))}
       </div>
       <p className="mt-6 text-xs leading-relaxed text-dim">
-        Contracts are unaudited and running on testnet. Don&apos;t send real funds until an audit is done and mainnet contracts are published.
+        {chain.testnet
+          ? "These contracts run on a testnet. Don't send real funds to them."
+          : "Contracts are unaudited. Only trade what you can afford to lose."}
       </p>
+      </div>
     </div>
   );
 }

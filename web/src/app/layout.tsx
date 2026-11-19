@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   description: "Launch a token on Base in one transaction: instant Uniswap v4 liquidity, LP locked forever, fees to you, your holders or a split.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://keelfun.app"),
   openGraph: { images: ["/og.png"], type: "website" },
-  twitter: { card: "summary_large_image", images: ["/og.png"], site: "@keelfun" },
+  twitter: { card: "summary_large_image", images: ["/og.png"], site: "@Keelfunxyz" },
 };
 
 export const viewport: Viewport = { themeColor: "#05070d", width: "device-width", initialScale: 1 };
@@ -23,10 +23,10 @@ export const viewport: Viewport = { themeColor: "#05070d", width: "device-width"
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} ${serif.variable} min-h-dvh overflow-x-clip antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${serif.variable} flex min-h-dvh flex-col overflow-x-clip antialiased`}>
         <Providers>
           <Header />
-          <main className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6">{children}</main>
+          <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-20 sm:px-6">{children}</main>
           <Footer />
         </Providers>
       </body>

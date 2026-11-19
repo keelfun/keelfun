@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { formatEther, isAddress } from "viem";
 import { useAccount } from "wagmi";
 import { ConnectButton } from "@/components/ConnectButton";
+import { Em, PageHero } from "@/components/PageHero";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { useClaim, useClaimable } from "@/components/FeesCard";
 import { usePortfolio, type Token } from "@/lib/api";
@@ -55,10 +56,11 @@ function PortfolioView() {
 
   if (!wallet)
     return (
-      <div className="flex flex-col items-center gap-4 py-24 text-center">
-        <p className="text-sm text-muted">Connect a wallet to see your holdings, launches and fee claims.</p>
-        <ConnectButton />
-      </div>
+      <PageHero title={<>Your <Em>portfolio</Em></>} sub="Connect a wallet to see your holdings, your launches and the fees you can claim.">
+        <div className="mt-7">
+          <ConnectButton />
+        </div>
+      </PageHero>
     );
 
   const ethUsd = data?.ethUsd ?? 0;
