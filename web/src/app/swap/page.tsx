@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { isAddress } from "viem";
 import { Em, PageHero } from "@/components/PageHero";
+import { AnySwap } from "@/components/AnySwap";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { TradePanel } from "@/components/TradePanel";
 import { useToken, useTokens } from "@/lib/api";
@@ -20,18 +21,18 @@ function SwapView() {
   const tokens = list?.tokens ?? [];
   const usd = list?.ethUsd ?? one?.ethUsd ?? 0;
   const pick = (a: string) => router.replace(`/swap/?a=${a.toLowerCase()}`, { scroll: false });
-  const t = one?.token ?? (!addr ? tokens[0] : undefined);
+  const t = one?.token;
 
   return (
     <div>
       <PageHero
         title={<Em>Swap</Em>}
-        sub={`Swap ETH for any ${BRAND} token on ${chain.name}'s Uniswap v4 pools, straight to your own wallet.`}
+        sub={`Swap any token on ${chain.name} at the best route, or trade ${BRAND} tokens straight against their Uniswap v4 pools.`}
       />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">
           <div className="rounded-2xl border border-line bg-panel p-4">
-            <p className="text-xs text-dim">Swap into any {BRAND} token: paste its contract address</p>
+            <p className="text-xs text-dim">Open a {BRAND} token pool: paste its contract address</p>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -44,13 +45,13 @@ function SwapView() {
             </form>
             {addr && error && <p className="mt-2 text-xs text-down">That isn&apos;t a {BRAND} token.</p>}
           </div>
-          {t ? (
-            <TradePanel token={t} />
+          {addr && one?.token ? (
+            <>
+              <Link href="/swap/" className="inline-block text-sm text-accent hover:underline">← Swap any token</Link>
+              <TradePanel token={one.token} />
+            </>
           ) : (
-            <div className="rounded-2xl border border-dashed border-line-2 px-4 py-14 text-center text-sm text-muted">
-              {DEPLOYED ? "No tokens to swap yet." : "Swaps open once the contracts are live."}{" "}
-              <Link href="/launch/" className="text-accent hover:underline">Launch the first one →</Link>
-            </div>
+            <AnySwap />
           )}
         </div>
         <div className="space-y-4">
