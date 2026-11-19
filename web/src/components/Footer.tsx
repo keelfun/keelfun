@@ -6,7 +6,7 @@ import { Socials } from "./Socials";
 const COLS: [string, [string, string][]][] = [
   [BRAND, [["Discover", "/"], ["Launch a token", "/launch/"], ["Swap", "/swap/"], ["Bridge", "/bridge/"], ["Portfolio", "/portfolio/"], ["Buyback", "/buyback/"], ["Builders", "/builders/"]]],
   ["Learn", [[`How ${BRAND} works`, "/docs/"], ["Fees, explained", "/docs/"], ["Holder rewards", "/docs/"]]],
-  ["Build", [[`Build on ${BRAND}`, "/builders/"], ["Builder programme", "/builders/#join"]]],
+  ["Build", [[`Build on ${BRAND}`, "/builders/"], ["Builder programme", "/builders/#join"], ["Platform fees", "/admin/"]]],
 ];
 
 export function Footer() {
