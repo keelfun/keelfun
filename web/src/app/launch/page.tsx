@@ -3,27 +3,28 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { isAddress, parseEther, parseEventLogs } from "viem";
+import { useQuery } from "@tanstack/react-query";
 import { useAccount, useBalance, useWriteContract } from "wagmi";
 import { launchFactoryAbi } from "@/lib/abis";
-import { Em, PageHero } from "@/components/PageHero";
-import { saveMetadata, uploadImage } from "@/lib/api";
+import { api, saveMetadata, uploadImage, type Stats } from "@/lib/api";
 import { ADDR, chain, DEPLOYED, FEE_TIERS, SUPPLY_TIERS } from "@/lib/config";
-import { fmtEth } from "@/lib/format";
+import { fmtEth, fmtPrice, fmtUsd } from "@/lib/format";
 import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
 
 const input =
-  "h-11 w-full rounded-xl border border-line bg-panel-2 px-3 text-sm outline-none placeholder:text-dim focus:border-accent/60";
+  "h-12 w-full rounded-2xl border border-line bg-panel px-4 text-sm outline-none placeholder:text-dim focus:border-accent/60";
 
-function Section({ n, title, sub, children }: { n: number; title: string; sub: string; children: React.ReactNode }) {
+// Every supply tier starts at the same market cap: tokens per ETH at the factory's start tick (200200).
+const START_CAP_ETH = 1e9 / Math.pow(1.0001, 200200);
+
+function Section({ n, title, sub, children }: { n: number; title: string; sub?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-line bg-panel p-4 sm:p-5">
-      <div className="mb-4 flex items-start gap-3">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 font-mono text-xs text-accent">{n}</span>
-        <div>
-          <h2 className="text-sm font-semibold">{title}</h2>
-          <p className="text-xs text-dim">{sub}</p>
-        </div>
+    <section className="pt-2">
+      <div className="mb-5 flex items-center gap-3">
+        <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-panel-2 px-1.5 font-mono text-xs text-muted">{String(n).padStart(2, "0")}</span>
+        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
       </div>
+      {sub && <p className="-mt-2 mb-5 max-w-2xl text-sm leading-relaxed text-muted">{sub}</p>}
       {children}
     </section>
   );
@@ -32,7 +33,7 @@ function Section({ n, title, sub, children }: { n: number; title: string; sub: s
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 flex items-baseline justify-between text-xs text-muted">
+      <span className="mb-2 flex items-baseline justify-between text-sm font-medium text-fg">
         <span>{label}</span>
         {hint && <span className="text-dim">{hint}</span>}
       </span>
@@ -53,8 +54,8 @@ function Pills<T extends string | number>({ options, value, onChange }: { option
             value === o.v ? "border-accent bg-accent/10 text-fg" : "border-line bg-panel-2 text-muted hover:border-line-2"
           }`}
         >
-          <p className="font-mono text-sm">{o.label}</p>
-          {o.sub && <p className="mt-0.5 text-[11px] text-dim">{o.sub}</p>}
+          <p className="truncate text-sm font-medium">{o.label}</p>
+          {o.sub && <p className="mt-0.5 truncate text-[11px] text-dim">{o.sub}</p>}
         </button>
       ))}
     </div>
@@ -63,7 +64,7 @@ function Pills<T extends string | number>({ options, value, onChange }: { option
 
 function Toggle({ on, set, label, sub }: { on: boolean; set: (v: boolean) => void; label: string; sub: string }) {
   return (
-    <button type="button" onClick={() => set(!on)} className="flex w-full items-center justify-between gap-4 rounded-xl border border-line bg-panel-2 p-3 text-left">
+    <button type="button" onClick={() => set(!on)} className="flex w-full items-center justify-between gap-4 rounded-2xl border border-line bg-panel p-4 text-left hover:border-line-2">
       <span>
         <span className="block text-sm">{label}</span>
         <span className="block text-xs text-dim">{sub}</span>
@@ -185,107 +186,129 @@ export default function LaunchPage() {
 
   const routeLabel = route === "holders" ? "Holders" : route === "creator" ? "You" : `${splits.length} wallets`;
 
-  return (
-    <div className="mx-auto max-w-5xl">
-      <PageHero
-        title={<>Launch a <Em>token</Em></>}
-        sub={`One transaction on ${chain.name}. The full supply goes into a Uniswap v4 pool and the LP is locked forever. No presale, no team allocation.`}
-      />
+  const [devBuy, setDevBuy] = useState(false);
+  const stats = useQuery({ queryKey: ["stats"], queryFn: () => api<Stats>("/stats"), refetchInterval: 60_000 });
+  const ethUsd = stats.data?.ethUsd ?? 0;
+  const supply = SUPPLY_TIERS[tier];
+  const startPriceEth = START_CAP_ETH / supply;
+  const usd = (eth: number) => (ethUsd > 0 ? fmtUsd(eth * ethUsd) : null);
 
-      <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-4">
-          <Section n={1} title="Identity" sub="Name, ticker, image and links">
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                <label className="flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-line-2 bg-panel-2 text-2xl text-dim hover:border-accent/60">
-                  {preview ? <img src={preview} alt="" className="h-full w-full object-cover" /> : "+"}
-                  <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
-                </label>
-                <div className="grid flex-1 gap-3 sm:grid-cols-[1fr_140px]">
-                  <Field label="Name" hint={`${name.length}/32`}>
-                    <input className={input} value={name} maxLength={32} onChange={(e) => setName(e.target.value)} placeholder="Blue Whale" />
+  return (
+    <div className="mx-auto max-w-7xl pt-8 sm:pt-12">
+      <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Launch a token</h1>
+      <p className="mt-2 text-sm text-muted sm:text-base">Mint a fixed-supply token and seed its locked Uniswap v4 pool on {chain.name} in one transaction.</p>
+
+      <form onSubmit={submit} className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_480px]">
+        <div className="min-w-0 space-y-10">
+          <Section n={1} title="Token Identity">
+            <div className="grid gap-5 sm:grid-cols-[220px_minmax(0,1fr)]">
+              <label className="mx-auto flex aspect-square w-40 cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-dashed border-line-2 bg-panel text-sm text-muted hover:border-accent/60 sm:w-[220px]">
+                {preview ? (
+                  <img src={preview} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <>
+                    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden><rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="9" cy="10" r="1.8" /><path d="m4 18 5-5 4 4 3-3 4 4" /></svg>
+                    <span>Logo</span>
+                  </>
+                )}
+                <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
+              </label>
+              <div className="min-w-0 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Token name *" hint={`${name.length}/32`}>
+                    <input className={input} value={name} maxLength={32} onChange={(e) => setName(e.target.value)} placeholder="Token name" />
                   </Field>
-                  <Field label="Ticker">
-                    <input
-                      className={`${input} font-mono uppercase`}
-                      value={symbol}
-                      maxLength={10}
-                      onChange={(e) => setSymbol(e.target.value.replace(/[^A-Za-z0-9]/g, ""))}
-                      placeholder="WHALE"
-                    />
+                  <Field label="Token symbol *">
+                    <input className={`${input} uppercase`} value={symbol} maxLength={10} onChange={(e) => setSymbol(e.target.value.replace(/[^A-Za-z0-9]/g, ""))} placeholder="TOKEN" />
                   </Field>
                 </div>
+                <Field label="Paired asset *">
+                  <div className={`${input} flex items-center gap-2.5`}>
+                    <img src="https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg" alt="" className="h-6 w-6 rounded-full" />
+                    <span className="font-medium">ETH</span>
+                    <span className="ml-auto rounded-full bg-panel-2 px-2.5 py-0.5 text-xs text-muted">Uniswap v4</span>
+                  </div>
+                </Field>
+                <details className="group rounded-2xl border border-line bg-panel" open>
+                  <summary className="flex h-12 cursor-pointer list-none items-center gap-2 px-4 text-sm font-medium">
+                    Market details
+                    <span className="ml-auto rounded-full bg-up/15 px-2.5 py-0.5 text-xs text-up">Launch enabled</span>
+                    <span className="text-dim transition-transform group-open:rotate-180">▾</span>
+                  </summary>
+                  <div className="border-t border-line p-4">
+                    <p className="mb-2 text-xs text-muted">Total supply</p>
+                    <Pills value={tier} onChange={setTier} options={SUPPLY_TIERS.map((_, i) => ({ v: i, label: SUPPLY_LABELS[i], sub: "tokens" }))} />
+                    <p className="mt-2 text-xs text-dim">Every supply starts at the same market cap. Only the unit price changes.</p>
+                  </div>
+                </details>
               </div>
+            </div>
+            <div className="mt-5 space-y-5">
               <Field label="Description" hint="optional">
-                <textarea
-                  className={`${input} h-20 resize-none py-2.5`}
-                  value={description}
-                  maxLength={600}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What is this token about?"
-                />
+                <textarea className={`${input} h-28 resize-y py-3`} value={description} maxLength={600} onChange={(e) => setDescription(e.target.value)} placeholder="What is this token about?" />
               </Field>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input className={input} value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="Website (optional)" />
-                <input className={input} value={x} onChange={(e) => setX(e.target.value)} placeholder="X link (optional)" />
-                <input className={input} value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="Telegram (optional)" />
-                <input className={input} value={discord} onChange={(e) => setDiscord(e.target.value)} placeholder="Discord (optional)" />
+              <div>
+                <p className="mb-2 text-sm font-medium">Links (optional)</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {(
+                    [
+                      ["https://", website, setWebsite, "yourproject.xyz"],
+                      ["x.com/", x, setX, "yourproject"],
+                      ["t.me/", telegram, setTelegram, "yourproject"],
+                    ] as const
+                  ).map(([pre, v, set, ph]) => (
+                    <div key={pre} className={`${input} flex items-center gap-0.5`}>
+                      <span className="text-muted">{pre}</span>
+                      <input className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-dim" value={v.replace(/^https?:\/\/(www\.)?(x\.com\/|twitter\.com\/|t\.me\/)?/, "")} onChange={(e) => set(e.target.value ? `https://${pre === "https://" ? "" : pre}${e.target.value.replace(/^https?:\/\//, "")}` : "")} placeholder={ph} />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </Section>
 
-          <Section n={2} title="Market" sub="Paired with ETH on Base · Uniswap v4">
-            <Field label="Total supply">
-              <Pills
-                value={tier}
-                onChange={setTier}
-                options={SUPPLY_TIERS.map((s, i) => ({ v: i, label: SUPPLY_LABELS[i], sub: s.toLocaleString("en-US") }))}
-              />
-            </Field>
-            <p className="mt-2 text-[11px] text-dim">Same starting market cap for every supply, only the unit price changes.</p>
-          </Section>
-
-          <Section n={3} title="Fees" sub="Charged in ETH on every buy and sell">
-            <div className="space-y-4">
-              <Field label="Trade fee">
-                <Pills
-                  value={feeBps}
-                  onChange={setFeeBps}
-                  options={FEE_TIERS.map((f) => ({ v: f.bps, label: `${f.bps / 100}%`, sub: `${(f.bps - f.platformBps) / 100}% to you` }))}
-                />
+          <Section n={2} title="Token Taxes" sub={`The trade fee applies to every buy and sell through the launch pool and includes the protocol fee. It is paid in ETH and fixed at launch. Ordinary wallet transfers are untaxed.`}>
+            <div className="space-y-6">
+              <Field label="Trade fee" hint={`protocol takes ${fee.platformBps / 100}% of it`}>
+                <Pills value={feeBps} onChange={setFeeBps} options={FEE_TIERS.map((f) => ({ v: f.bps, label: `${f.bps / 100}%`, sub: `${(f.bps - f.platformBps) / 100}% to you` }))} />
               </Field>
-              <Field label="Fees go to">
+              <Field label="Tax allocation" hint={`${routePct}% of each trade after protocol`}>
                 <Pills
                   value={route}
                   onChange={setRoute}
                   options={[
-                    { v: "creator", label: "Creator", sub: "your wallet" },
-                    { v: "holders", label: "Holders", sub: "pro-rata ETH" },
-                    { v: "split", label: "Split", sub: "up to 4 wallets" },
+                    { v: "creator", label: "Creator funds", sub: "your wallet" },
+                    { v: "holders", label: "Holder dividends", sub: "ETH, pro-rata" },
+                    { v: "split", label: "Split wallets", sub: "up to 4 wallets" },
                   ]}
                 />
               </Field>
+              {route === "creator" && (
+                <div className="rounded-2xl border border-line bg-panel p-4 text-sm">
+                  <p className="font-medium">Creator funds recipient</p>
+                  <p className="mt-1 font-mono text-xs text-muted">{address ?? "Your connected wallet"}</p>
+                </div>
+              )}
+              {route === "holders" && (
+                <p className="text-sm leading-relaxed text-muted">{routePct}% of every trade is paid in ETH to everyone holding the token, pro-rata to their balance. Holders claim anytime.</p>
+              )}
               {route === "split" && (
                 <div className="space-y-2">
-                  {splits.map((s, i) => (
+                  {splits.map((sp, i) => (
                     <div key={i} className="flex gap-2">
-                      <input className={`${input} font-mono text-xs`} value={s.address} onChange={(e) => setSplit(i, { address: e.target.value.trim() })} placeholder="0x… wallet" />
+                      <input className={`${input} font-mono text-xs`} value={sp.address} onChange={(e) => setSplit(i, { address: e.target.value.trim() })} placeholder="0x… wallet" />
                       <div className="relative w-24 shrink-0">
-                        <input className={`${input} pr-6 font-mono`} inputMode="decimal" value={s.pct} onChange={(e) => setSplit(i, { pct: e.target.value.replace(/[^0-9.]/g, "") })} />
-                        <span className="absolute top-3 right-2.5 text-xs text-dim">%</span>
+                        <input className={`${input} pr-7 font-mono`} inputMode="decimal" value={sp.pct} onChange={(e) => setSplit(i, { pct: e.target.value.replace(/[^0-9.]/g, "") })} />
+                        <span className="absolute top-3.5 right-3 text-xs text-dim">%</span>
                       </div>
                       {splits.length > 2 && (
-                        <button type="button" className="px-1 text-dim hover:text-down" onClick={() => setSplits(splits.filter((_, j) => j !== i))}>
-                          ×
-                        </button>
+                        <button type="button" className="px-1 text-dim hover:text-down" onClick={() => setSplits(splits.filter((_, j) => j !== i))}>×</button>
                       )}
                     </div>
                   ))}
                   <div className="flex justify-between text-xs">
                     {splits.length < 4 ? (
-                      <button type="button" className="text-accent hover:underline" onClick={() => setSplits([...splits, { address: "", pct: "0" }])}>
-                        + Add wallet
-                      </button>
+                      <button type="button" className="text-accent hover:underline" onClick={() => setSplits([...splits, { address: "", pct: "0" }])}>+ Add wallet</button>
                     ) : (
                       <span />
                     )}
@@ -293,67 +316,92 @@ export default function LaunchPage() {
                   </div>
                 </div>
               )}
-              {route === "holders" && (
-                <p className="text-xs leading-relaxed text-dim">
-                  {routePct}% of every trade is paid in ETH to everyone holding the token, pro-rata to their balance. Holders claim anytime.
-                </p>
+            </div>
+          </Section>
+
+          <Section n={3} title="Launch Options">
+            <div className="space-y-3">
+              <Toggle on={devBuy} set={(v) => { setDevBuy(v); if (!v) setBuy(""); }} label="Include Dev Buy" sub="Buy tokens as part of the launch, in the same transaction. Tax-free." />
+              {devBuy && (
+                <div className="rounded-2xl border border-line bg-panel p-4">
+                  <Field label="Amount" hint={bal ? `balance ${fmtEth(Number(bal.formatted))}` : undefined}>
+                    <div className="relative">
+                      <input className={`${input} bg-bg pr-14 font-mono`} inputMode="decimal" value={buy} onChange={(e) => setBuy(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.0" />
+                      <span className="absolute top-3.5 right-4 text-xs text-dim">ETH</span>
+                    </div>
+                  </Field>
+                  <div className="mt-2 flex gap-2">
+                    {["0.01", "0.05", "0.1", "0.5"].map((v) => (
+                      <button key={v} type="button" onClick={() => setBuy(v)} className="rounded-lg border border-line px-2.5 py-1 font-mono text-xs text-muted hover:text-fg">{v}</button>
+                    ))}
+                  </div>
+                </div>
               )}
+              <Toggle on={antiSnipe} set={setAntiSnipe} label="Enable anti-sniping" sub="Buys start with a 90% fee that drops to 0 over 60 seconds. The dev buy skips it." />
             </div>
-          </Section>
-
-          <Section n={4} title="Anti-snipe" sub="Protects the first minute">
-            <Toggle on={antiSnipe} set={setAntiSnipe} label="Snipe tax" sub="Buys pay 90% tax at launch, decaying to 0 over 60 seconds" />
-          </Section>
-
-          <Section n={5} title="First buy" sub="Optional, in the launch transaction, tax-free">
-            <Field label="Amount" hint={bal ? `balance ${fmtEth(Number(bal.formatted))}` : undefined}>
-              <div className="relative">
-                <input className={`${input} pr-14 font-mono`} inputMode="decimal" value={buy} onChange={(e) => setBuy(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.0" />
-                <span className="absolute top-3 right-3 text-xs text-dim">ETH</span>
-              </div>
-            </Field>
-            <div className="mt-2 flex gap-2">
-              {["0.01", "0.05", "0.1", "0.5"].map((p) => (
-                <button key={p} type="button" onClick={() => setBuy(p)} className="rounded-lg border border-line px-2.5 py-1 font-mono text-xs text-muted hover:text-fg">
-                  {p}
-                </button>
-              ))}
-            </div>
+            <p className="mt-5 text-xs leading-relaxed text-dim">The token and its Uniswap v4 market go live together, priced in ETH. The fixed supply is minted once and seeded into a pool whose liquidity stays locked forever.</p>
           </Section>
         </div>
 
-        <aside className="lg:sticky lg:top-20 lg:self-start">
-          <div className="rounded-2xl border border-line bg-panel p-5">
-            <p className="text-xs text-dim">Preview</p>
+        <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+          <div className="rounded-3xl border border-line bg-panel p-5">
+            <p className="text-xs text-muted">Live preview</p>
             <div className="mt-3 flex items-center gap-3">
               {preview ? (
                 <img src={preview} alt="" className="h-12 w-12 rounded-xl object-cover" />
               ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-panel-2 font-mono text-xs text-dim">{symbol.slice(0, 3) || "?"}</div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-lg font-semibold text-white">{(symbol || name || "T").slice(0, 1).toUpperCase()}</div>
               )}
-              <div className="min-w-0">
-                <p className="truncate font-semibold">{name || "Token name"}</p>
-                <p className="font-mono text-xs text-muted">${symbol.toUpperCase() || "TICKER"}</p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-lg font-semibold">{name || "Your token"}</p>
+                <p className="text-sm text-muted">{(symbol || "TOKEN").toUpperCase()}/ETH</p>
+              </div>
+              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">NEW</span>
+            </div>
+            <p className="mt-4 line-clamp-3 text-sm text-fg/80">{description || "Fixed-supply token trading on a locked Uniswap v4 pool."}</p>
+            <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-xs text-muted">Start price</p>
+                <p className="mt-1 font-medium">≈ {usd(startPriceEth) ?? `${fmtPrice(startPriceEth)} ETH`}</p>
+                <p className="mt-0.5 text-xs text-dim">{fmtPrice(startPriceEth)} ETH</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted">Launch cap</p>
+                <p className="mt-1 font-medium">≈ {usd(START_CAP_ETH) ?? fmtEth(START_CAP_ETH)}</p>
+                <p className="mt-0.5 text-xs text-dim">{START_CAP_ETH.toFixed(4)} ETH</p>
               </div>
             </div>
-            <dl className="mt-4 space-y-2 border-t border-line pt-4 font-mono text-xs">
-              <div className="flex justify-between"><dt className="text-dim">Network</dt><dd>{chain.name}</dd></div>
-              <div className="flex justify-between"><dt className="text-dim">Pair</dt><dd>ETH · Uniswap v4</dd></div>
-              <div className="flex justify-between"><dt className="text-dim">Supply</dt><dd>{SUPPLY_LABELS[tier]}</dd></div>
-              <div className="flex justify-between"><dt className="text-dim">Trade fee</dt><dd>{feeBps / 100}%</dd></div>
-              <div className="flex justify-between"><dt className="text-dim">→ {routeLabel}</dt><dd className="text-accent">{routePct}%</dd></div>
-              <div className="flex justify-between"><dt className="text-dim">→ Platform</dt><dd>{fee.platformBps / 100}%</dd></div>
-              <div className="flex justify-between"><dt className="text-dim">Anti-snipe</dt><dd>{antiSnipe ? "60s" : "off"}</dd></div>
-              <div className="flex justify-between"><dt className="text-dim">First buy</dt><dd>{buyEth ? `${buyEth} ETH` : "none"}</dd></div>
-              <div className="flex justify-between"><dt className="text-dim">LP</dt><dd className="text-accent">locked forever</dd></div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="flex items-center gap-1.5 rounded-full bg-panel-2 px-2.5 py-1 text-xs"><img src="https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg" alt="" className="h-4 w-4 rounded-full" />ETH</span>
+              <span className="rounded-full bg-up/15 px-2.5 py-1 text-xs text-up">LP locked</span>
+              {antiSnipe && <span className="rounded-full bg-panel-2 px-2.5 py-1 text-xs text-muted">Anti-snipe</span>}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-line bg-panel p-5">
+            <dl className="space-y-3 text-sm">
+              {(
+                [
+                  ["Fixed supply", SUPPLY_LABELS[tier]],
+                  ["Pool model", "Locked pool"],
+                  ["Launch market cap", `≈ ${usd(START_CAP_ETH) ?? fmtEth(START_CAP_ETH)}`],
+                  ["Trade fee", `${feeBps / 100}%`],
+                  [`→ ${routeLabel}`, `${routePct}%`],
+                  ["→ Protocol", `${fee.platformBps / 100}%`],
+                  ["Dev buy", buyEth ? `${buyEth} ETH` : "None"],
+                  ["Paired asset", "ETH"],
+                ] as const
+              ).map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-4">
+                  <dt className="text-muted">{k}</dt>
+                  <dd className="font-medium">{v}</dd>
+                </div>
+              ))}
             </dl>
-            <button
-              type="submit"
-              disabled={!valid || !!step || !DEPLOYED}
-              className="mt-5 h-12 w-full rounded-xl bg-accent text-sm font-semibold text-accent-ink transition-opacity disabled:opacity-40"
-            >
-              {!DEPLOYED ? "Contracts not deployed yet" : step ?? (address ? "Launch token" : "Connect & launch")}
+            <button type="submit" disabled={!valid || !!step || !DEPLOYED} className="mt-5 h-14 w-full rounded-full bg-[#7fd4ff] text-base font-semibold text-[#05070d] transition-opacity hover:opacity-90 disabled:opacity-40">
+              {!DEPLOYED ? "Contracts not deployed yet" : step ?? (address ? "Launch token" : "Connect wallet")}
             </button>
+            <p className="mt-3 text-center text-xs text-dim">You&apos;ll confirm the transaction in your wallet. Nothing is minted until you submit.</p>
             {error && <p className="mt-3 text-xs text-down">{error}</p>}
             {route === "split" && !splitOk && <p className="mt-3 text-xs text-dim">Split needs unique valid wallets totaling 100%.</p>}
           </div>
