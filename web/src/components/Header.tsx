@@ -58,7 +58,7 @@ export function Header() {
           </span>
           <Link
             href="/launch/"
-            className="hidden h-9 items-center rounded-lg border border-accent/40 px-3 text-sm font-medium text-accent hover:bg-accent/10 sm:flex"
+            className="hidden h-9 items-center whitespace-nowrap rounded-lg border border-accent/40 px-3 text-sm font-medium text-accent hover:bg-accent/10 sm:flex lg:hidden xl:flex"
           >
             + Launch
           </Link>
