@@ -186,7 +186,7 @@ export class Indexer extends DurableObject<Env> {
     if (this.env.FACTORY === ZERO) return;
     const head = await this.rpc.blockNumber();
     let cursor = Number(this.meta("cursor") ?? Number(this.env.START_BLOCK) - 1);
-    let span = MAX_SPAN;
+    let span = Number(this.env.LOG_SPAN || MAX_SPAN);
     while (cursor < head) {
       const from = cursor + 1;
       const to = Math.min(head, cursor + span);
@@ -283,7 +283,8 @@ export class Indexer extends DurableObject<Env> {
     }
     const transfers = parseEventLogs({ abi: launchTokenAbi, logs: transferLogs.map(toViemLog), eventName: "Transfer", strict: false });
 
-    const blocks = [...new Set([...core, ...transfers].map((l) => Number(l.blockNumber)))];
+    const timed = core.filter((l) => l.eventName === "TokenLaunched" || l.eventName === "Trade");
+    const blocks = [...new Set([...timed, ...transfers].map((l) => Number(l.blockNumber)))];
     const ts = await this.rpc.blockTimestamps(blocks);
 
     const metas = new Map<string, Row>();

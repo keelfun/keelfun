@@ -9,6 +9,7 @@ export interface Env {
   FACTORY: string;
   HOOK: string;
   START_BLOCK: string;
+  LOG_SPAN?: string;
   START_TICK: string;
   POOL_MANAGER?: string;
 }
@@ -21,7 +22,7 @@ const CORS: Record<string, string> = {
 };
 
 function stub(env: Env) {
-  return env.INDEXER.get(env.INDEXER.idFromName(`main-${env.CHAIN_ID}-${env.FACTORY.slice(2, 10).toLowerCase()}-3`));
+  return env.INDEXER.get(env.INDEXER.idFromName(`main-${env.CHAIN_ID}-${env.FACTORY.slice(2, 10).toLowerCase()}-6`));
 }
 
 export default {

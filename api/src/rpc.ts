@@ -18,7 +18,7 @@ export class Rpc {
 
   async batch<T = unknown>(calls: { method: string; params: unknown[] }[]): Promise<T[]> {
     if (calls.length === 0) return [];
-    let last: unknown;
+    const errors: string[] = [];
     for (let n = 0; n < this.urls.length; n++) {
       const idx = (this.current + n) % this.urls.length;
       try {
@@ -26,10 +26,10 @@ export class Rpc {
         this.current = idx;
         return out;
       } catch (e) {
-        last = e;
+        errors.push(`${new URL(this.urls[idx]).host}: ${(e as Error).message}`.slice(0, 120));
       }
     }
-    throw last;
+    throw new Error(errors.join(" | "));
   }
 
   private async batchOn<T>(url: string, calls: { method: string; params: unknown[] }[]): Promise<T[]> {
@@ -71,8 +71,8 @@ export class Rpc {
 
   async blockTimestamps(blocks: number[]): Promise<Map<number, number>> {
     const out = new Map<number, number>();
-    for (let i = 0; i < blocks.length; i += 50) {
-      const chunk = blocks.slice(i, i + 50);
+    for (let i = 0; i < blocks.length; i += 5) {
+      const chunk = blocks.slice(i, i + 5);
       const res = await this.batch<{ timestamp: string }>(
         chunk.map((b) => ({ method: "eth_getBlockByNumber", params: ["0x" + b.toString(16), false] })),
       );

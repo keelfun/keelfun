@@ -13,7 +13,8 @@
   "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true },
   "vars": {
-    "RPC_URL": "https://base-rpc.publicnode.com,https://base.drpc.org,https://mainnet.base.org",
+    "RPC_URL": "https://gateway.tenderly.co/public/base,https://base-pokt.nodies.app,https://1rpc.io/base,https://base.drpc.org,https://base-rpc.publicnode.com,https://mainnet.base.org",
+    "LOG_SPAN": "50",
     "CHAIN_ID": "8453",
     "FACTORY": "0xDC802747d6c5271e2fC8a51bc52D279bDb80b463",
     "HOOK": "0xD7aDF63eDeb2e784bb949d9f848f9aE2D104A8Cc",
