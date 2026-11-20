@@ -10,9 +10,12 @@ const NAV = [
   { href: "/swap/", label: "Swap" },
   { href: "/portfolio/", label: "Portfolio" },
   { href: "/buyback/", label: "Buyback" },
+  { href: "/flywheel/", label: "Flywheel" },
+  { href: "/revenue/", label: "Revenue" },
   { href: "/bridge/", label: "Bridge" },
   { href: "/builders/", label: "Builders" },
   { href: "/docs/", label: "Docs" },
+  { href: "/api/", label: "API" },
 ];
 
 export function Logo({ className = "" }: { className?: string }) {
@@ -42,14 +45,14 @@ export function Header() {
             <Link
               key={n.href}
               href={n.href}
-              className={`rounded-lg px-2.5 py-1.5 text-sm transition-colors ${active(n.href) ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}
+              className={`rounded-lg px-2 py-1.5 text-sm transition-colors xl:px-2.5 ${active(n.href) ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}
             >
               {n.label}
             </Link>
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 font-mono text-[11px] text-muted lg:flex">
+          <span className="hidden items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 font-mono text-[11px] text-muted xl:flex">
             <span className={`h-1.5 w-1.5 rounded-full ${chain.testnet ? "bg-warn" : "bg-accent"}`} />
             {chain.name}
           </span>

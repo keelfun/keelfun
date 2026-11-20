@@ -537,6 +537,10 @@ export class Indexer extends DurableObject<Env> {
           return json(this.portfolio(lc(parts[1] ?? "")));
         case "builders":
           return json(this.builders());
+        case "revenue":
+          return json(this.revenue());
+        case "flywheel":
+          return json(this.flywheel());
         case "images":
           return this.image(parts[1] ?? "");
         case "metadata": {
@@ -593,6 +597,66 @@ export class Indexer extends DurableObject<Env> {
         (SELECT COUNT(*) FROM balances b WHERE b.token = t.address AND b.amount != '0' AND b.holder NOT IN (${ex})) AS holders
         FROM tokens t ${where}`,
       binds: [Math.floor(Date.now() / 1000) - 86_400, ...this.excluded] as SqlStorageValue[],
+    };
+  }
+
+  private revenue() {
+    const toks = this.sql.exec("SELECT address, pair, volume, platform_fees, route_fees FROM tokens").toArray();
+    const kOf = new Map<string, number>();
+    let volume = 0, platform = 0, creator = 0;
+    const byPair: Record<string, { symbol: string; amount: number; eth: number }> = {};
+    for (const t of toks) {
+      const k = this.pairEth(t.pair);
+      kOf.set(String(t.address), k);
+      volume += Number(t.volume) * k;
+      platform += Number(t.platform_fees) * k;
+      creator += Number(t.route_fees) * k;
+      const sym = pairOf(t.pair).symbol;
+      const e = (byPair[sym] ??= { symbol: sym, amount: 0, eth: 0 });
+      e.amount += Number(t.platform_fees);
+      e.eth += Number(t.platform_fees) * k;
+    }
+    let holders = 0, burns = 0, claims = 0, burnCount = 0;
+    for (const e of this.sql.exec("SELECT token, kind, SUM(amount) AS a, COUNT(*) AS c FROM fee_events GROUP BY token, kind").toArray()) {
+      const v = Number(e.a) * (kOf.get(String(e.token)) ?? 0);
+      if (e.kind === "holders") holders += v;
+      else if (e.kind === "claim") claims += v;
+      else if (e.kind === "burn") { burns += v; burnCount += Number(e.c); }
+    }
+    const days = new Map<number, { day: number; volumeEth: number; feesEth: number; trades: number }>();
+    for (const r of this.sql.exec("SELECT token, CAST(ts / 86400 AS INTEGER) AS d, SUM(eth) AS v, SUM(fee) AS f, COUNT(*) AS c FROM trades WHERE ts > 0 GROUP BY token, d").toArray()) {
+      const k = kOf.get(String(r.token)) ?? 0;
+      const d = Number(r.d);
+      const x = days.get(d) ?? { day: d * 86400, volumeEth: 0, feesEth: 0, trades: 0 };
+      x.volumeEth += Number(r.v) * k;
+      x.feesEth += Number(r.f) * k;
+      x.trades += Number(r.c);
+      days.set(d, x);
+    }
+    return {
+      ethUsd: this.ethUsd(), volumeEth: volume, platformFeesEth: platform, creatorFeesEth: creator, holdersEth: holders, burnsEth: burns,
+      claimsEth: claims, burnCount, byPair: Object.values(byPair).filter((p) => p.amount > 0).sort((a, b) => b.eth - a.eth),
+      daily: [...days.values()].sort((a, b) => a.day - b.day).slice(-90),
+    };
+  }
+
+  private flywheel() {
+    const top = this.listTokens(new URLSearchParams("sort=top&limit=10")).tokens.slice(0, 10);
+    const total = top.reduce((sum, t) => sum + (Number(t.fdvEth) || 0), 0);
+    let burnedEth = 0;
+    for (const r of this.sql.exec("SELECT f.token, t.pair, SUM(f.amount) AS a FROM fee_events f JOIN tokens t ON t.address = f.token WHERE f.kind = 'burn' GROUP BY f.token").toArray())
+      burnedEth += Number(r.a) * this.pairEth(r.pair);
+    const agg = this.sql.exec("SELECT COUNT(*) AS c, COUNT(DISTINCT token) AS n FROM fee_events WHERE kind = 'burn'").toArray()[0];
+    const recent = this.sql
+      .exec("SELECT f.token, f.amount, f.tokens, f.ts, f.tx, t.symbol, t.image, t.pair FROM fee_events f JOIN tokens t ON t.address = f.token WHERE f.kind = 'burn' ORDER BY f.block DESC LIMIT 30")
+      .toArray()
+      .map((r) => ({
+        token: r.token, symbol: r.symbol, image: r.image, pairSymbol: pairOf(r.pair).symbol, amount: Number(r.amount),
+        eth: Number(r.amount) * this.pairEth(r.pair), tokens: Number(r.tokens), ts: Number(r.ts), tx: r.tx,
+      }));
+    return {
+      ethUsd: this.ethUsd(), burnedEth, burns: Number(agg?.c ?? 0), tokensReached: Number(agg?.n ?? 0),
+      rankings: top.map((t) => ({ ...t, weight: total ? Number(t.fdvEth) / total : 0 })), recent,
     };
   }
 

@@ -117,6 +117,16 @@ export const useTrades = (address?: string) =>
   });
 
 export type FeeEvent = { id: string; kind: "buy_tax" | "sell_tax" | "claim" | "holders" | "burn"; who: string; amount: number; tokens: number; ts: number; block: number; tx: string };
+export type Revenue = {
+  ethUsd: number; volumeEth: number; platformFeesEth: number; creatorFeesEth: number; holdersEth: number; burnsEth: number; claimsEth: number;
+  burnCount: number; byPair: { symbol: string; amount: number; eth: number }[]; daily: { day: number; volumeEth: number; feesEth: number; trades: number }[];
+};
+export type Flywheel = {
+  ethUsd: number; burnedEth: number; burns: number; tokensReached: number; rankings: (Token & { weight: number })[];
+  recent: { token: string; symbol: string; image: string | null; pairSymbol: string; amount: number; eth: number; tokens: number; ts: number; tx: string }[];
+};
+export const useRevenue = () => useQuery({ queryKey: ["revenue"], queryFn: () => api<Revenue>("/revenue"), refetchInterval: 15000 });
+export const useFlywheel = () => useQuery({ queryKey: ["flywheel"], queryFn: () => api<Flywheel>("/flywheel"), refetchInterval: 15000 });
 export const useFees = (address?: string) =>
   useQuery({
     queryKey: ["fees", address],
