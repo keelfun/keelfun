@@ -320,9 +320,8 @@ export class Indexer extends DurableObject<Env> {
     for (let i = 0; i < stocks.length; i += 30) {
       try {
         const chunk = stocks.slice(i, i + 30);
-        const j = (await get(`https://api.dexscreener.com/latest/dex/tokens/${chunk.join(",")}`)) as {
-          pairs?: { chainId: string; baseToken: { address: string }; priceUsd?: string; liquidity?: { usd?: number } }[];
-        };
+        const j = { pairs: (await get(`https://api.dexscreener.com/tokens/v1/base/${chunk.join(",")}`)) as {
+          chainId: string; baseToken: { address: string }; priceUsd?: string; liquidity?: { usd?: number } }[] };
         const best = new Map<string, { px: number; liq: number }>();
         for (const pr of j.pairs ?? []) {
           const a = lc(pr.baseToken.address);
@@ -331,7 +330,15 @@ export class Indexer extends DurableObject<Env> {
           if (!best.has(a) || best.get(a)!.liq < liq) best.set(a, { px: Number(pr.priceUsd), liq });
         }
         for (const [a, v] of best) this.setMeta(`px_${a}`, String(v.px));
+        const miss = chunk.filter((a) => !best.has(a));
+        if (miss.length) {
+          const g = (await get(`https://api.geckoterminal.com/api/v2/simple/networks/base/token_price/${miss.join(",")}`)) as {
+            data?: { attributes?: { token_prices?: Record<string, string> } };
+          };
+          for (const [a, v] of Object.entries(g.data?.attributes?.token_prices ?? {})) if (Number(v) > 0) this.setMeta(`px_${lc(a)}`, String(Number(v)));
+        }
       } catch (e) {
+        this.setMeta("px_err", `${new Date().toISOString()} ${(e as Error).message}`.slice(0, 200));
         console.error("stock prices", e);
       }
     }
@@ -571,6 +578,8 @@ export class Indexer extends DurableObject<Env> {
       platformFeesEth: Number(c.pfees),
       volumeEth: Number(c.volume),
       trades: Number(c.trades),
+      pricedPairs: Number(this.sql.exec("SELECT COUNT(*) AS n FROM meta WHERE key LIKE 'px\\_0x%' ESCAPE '\\'").toArray()[0]?.n ?? 0),
+      priceError: this.meta("px_err"),
       lastError: this.meta("last_error") || undefined,
     };
   }

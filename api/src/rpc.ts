@@ -38,10 +38,11 @@ export class Rpc {
       signal: AbortSignal.timeout(15_000),
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(body.length === 1 ? body[0] : body),
     });
     if (!res.ok) throw new Error(`rpc http ${res.status}`);
-    const json = (await res.json()) as { id: number; result?: T; error?: { message: string } }[];
+    const raw = (await res.json()) as unknown;
+    const json = (Array.isArray(raw) ? raw : [raw]) as { id: number; result?: T; error?: { message: string } }[];
     const byId = new Map(json.map((r) => [r.id, r]));
     return body.map((b) => {
       const r = byId.get(b.id);

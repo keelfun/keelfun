@@ -13,7 +13,7 @@
   "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true },
   "vars": {
-    "RPC_URL": "https://gateway.tenderly.co/public/base,https://base-pokt.nodies.app,https://1rpc.io/base,https://base.drpc.org,https://base-rpc.publicnode.com,https://mainnet.base.org",
+    "RPC_URL": "https://gateway.tenderly.co/public/base,https://base-pokt.nodies.app,https://1rpc.io/base,https://base.llamarpc.com,https://base.meowrpc.com,https://base-mainnet.public.blastapi.io,https://endpoints.omniatech.io/v1/base/mainnet/public,https://base.drpc.org,https://base-rpc.publicnode.com,https://mainnet.base.org",
     "LOG_SPAN": "50",
     "CHAIN_ID": "8453",
     "FACTORY": "0xDC802747d6c5271e2fC8a51bc52D279bDb80b463",

@@ -145,7 +145,7 @@ function Activity({ t }: { t: Token; ethUsd: number }) {
                       {r.trader === t.creator ? "dev" : shortAddr(r.trader)}
                     </Link>
                   </td>
-                  <td className={`${td} text-right text-muted`}>{tx(r.tx, timeAgo(r.ts))}</td>
+                  <td className={`${td} text-right text-muted`}>{tx(r.tx, `${timeAgo(r.ts)} ago`)}</td>
                 </tr>
               ))}
             </tbody>
@@ -195,7 +195,7 @@ function Activity({ t }: { t: Token; ethUsd: number }) {
                   </td>
                   <td className={`${td} text-right`}>{fmtCompact(f.amount)}</td>
                   <td className={`${td} hidden text-right text-muted sm:table-cell`}>{f.who ? shortAddr(f.who) : "—"}</td>
-                  <td className={`${td} text-right text-muted`}>{tx(f.tx, timeAgo(f.ts))}</td>
+                  <td className={`${td} text-right text-muted`}>{tx(f.tx, `${timeAgo(f.ts)} ago`)}</td>
                 </tr>
               ))}
             </tbody>
