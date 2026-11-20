@@ -48,7 +48,7 @@ export default function RevenuePage() {
         </div>
         <div className="mt-6 flex h-48 items-end gap-1">
           {days.map((d) => (
-            <div key={d.day} className="group relative flex h-full flex-1 items-end">
+            <div key={d.day} className="group relative flex h-full max-w-10 flex-1 items-end">
               <div className="anim-rise w-full rounded-t bg-accent/70 transition-colors group-hover:bg-accent" style={{ height: `${Math.max(2, (d[metric] / max) * 100)}%` }} />
               <span className="pointer-events-none absolute -top-8 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-panel-2 px-2 py-1 font-mono text-[10px] group-hover:block">
                 {new Date(d.day * 1000).toLocaleDateString("en", { month: "short", day: "numeric" })} · {fmtValue(d[metric], usd)}
