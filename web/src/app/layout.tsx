@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { BRAND } from "@/lib/config";
+import { THEME_BOOT } from "@/lib/theme";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -22,7 +23,10 @@ export const viewport: Viewport = { themeColor: "#05070d", width: "device-width"
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${serif.variable} flex min-h-dvh flex-col overflow-x-clip antialiased`}>
         <Providers>
           <Header />
