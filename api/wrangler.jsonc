@@ -13,12 +13,12 @@
   "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true },
   "vars": {
-    "RPC_URL": "https://base-rpc.publicnode.com",
+    "RPC_URL": "https://base-rpc.publicnode.com,https://base.drpc.org,https://mainnet.base.org",
     "CHAIN_ID": "8453",
-    "FACTORY": "0x736dE2DbC4468F8224c63a11355980fB33949387",
-    "HOOK": "0x7fA1311D29603211365b34a35eEF99208f06A8CC",
+    "FACTORY": "0xDC802747d6c5271e2fC8a51bc52D279bDb80b463",
+    "HOOK": "0xD7aDF63eDeb2e784bb949d9f848f9aE2D104A8Cc",
     "POOL_MANAGER": "0x498581ff718922c3f8e6a244956af099b2652b2b",
-    "START_BLOCK": "59684172",
+    "START_BLOCK": "59736515",
     "START_TICK": "200200"
   }
 }

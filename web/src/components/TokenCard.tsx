@@ -15,7 +15,7 @@ export function TokenCard({ t, ethUsd }: { t: Token; ethUsd: number }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate font-semibold">{t.name}</p>
-            <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] font-medium text-accent">{t.feeBps / 100}%</span>
+            <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] font-medium text-accent">{t.buyBps / 100}/{t.sellBps / 100}%</span>
           </div>
           <p className="font-mono text-xs text-muted">
             ${t.symbol} · {shortAddr(t.creator)} · {timeAgo(t.createdAt)}
@@ -40,7 +40,10 @@ export function TokenCard({ t, ethUsd }: { t: Token; ethUsd: number }) {
       </div>
       <div className="mt-auto flex flex-wrap gap-1.5 font-mono text-[10px] text-dim">
         <span className="rounded-md border border-line px-1.5 py-0.5">{fmtCompact(t.supply)} supply</span>
-        <span className="rounded-md border border-line px-1.5 py-0.5">{t.holdersRoute ? "fees → holders" : "fees → creator"}</span>
+        <span className="rounded-md border border-line px-1.5 py-0.5">{t.pairSymbol ?? "ETH"} pair</span>
+        <span className="rounded-md border border-line px-1.5 py-0.5">
+          {[t.creatorBps && "creator", t.holdersBps && "holders", t.burnBps && "burn"].filter(Boolean).join(" · ") || "fees → creator"}
+        </span>
         {t.antiSnipe && <span className="rounded-md border border-line px-1.5 py-0.5">anti-snipe</span>}
       </div>
     </Link>

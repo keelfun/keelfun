@@ -16,7 +16,7 @@
 <p align="center">
   <a href="https://keelfun.app"><b>keelfun.app</b></a> ·
   <a href="https://x.com/Keelfunxyz">X @Keelfunxyz</a> ·
-  <a href="https://basescan.org/address/0x736dE2DbC4468F8224c63a11355980fB33949387">Factory on Basescan</a>
+  <a href="https://basescan.org/address/0xDC802747d6c5271e2fC8a51bc52D279bDb80b463">Factory on Basescan</a>
 </p>
 
 ---
@@ -36,8 +36,11 @@
 | | |
 |---|---|
 | **Supply tiers** | 1B · 10B · 100B · 1T, fixed forever |
-| **Trade fee** | 1% · 2% · 3% · 5% · 10% |
-| **Fee routes** | Creator, holders (ETH rewards), or a split across up to 4 wallets |
+| **Taxes** | Separate buy and sell tax, 1%–10% each (protocol fee included) |
+| **Pairs** | ETH, USDC, cbBTC and 37 tokenized stocks (Coinbase, Dinari, Backed, ST0x) |
+| **Tax allocation** | Any split of creator wallets (up to 4), holder dividends and buyback-and-burn |
+| **Vanity address** | Optional token address suffix, mined in the browser |
+| **Metadata** | Editable by the creator, or locked forever |
 | **Anti-snipe** | Optional: a 90% tax that decays to 0 over the first 60 seconds |
 | **First buy** | Optional, tax-free, in the same launch transaction |
 | **Liquidity** | 100% of supply in Uniswap v4, locked forever |
@@ -63,12 +66,12 @@
 
 | Contract | Address |
 |---|---|
-| LaunchFactory | [`0x736dE2DbC4468F8224c63a11355980fB33949387`](https://basescan.org/address/0x736dE2DbC4468F8224c63a11355980fB33949387) |
-| LaunchHook | [`0x7fA1311D29603211365b34a35eEF99208f06A8CC`](https://basescan.org/address/0x7fA1311D29603211365b34a35eEF99208f06A8CC) |
-| LaunchRouter | [`0x7c3Afc67Ce06C2bBFEfB580243F6aD01948C0473`](https://basescan.org/address/0x7c3Afc67Ce06C2bBFEfB580243F6aD01948C0473) |
+| LaunchFactory | [`0xDC802747d6c5271e2fC8a51bc52D279bDb80b463`](https://basescan.org/address/0xDC802747d6c5271e2fC8a51bc52D279bDb80b463) |
+| LaunchHook | [`0xD7aDF63eDeb2e784bb949d9f848f9aE2D104A8Cc`](https://basescan.org/address/0xD7aDF63eDeb2e784bb949d9f848f9aE2D104A8Cc) |
+| LaunchRouter | [`0x9AfFc874A3DCd94DF5Bd6eB23d4f48687f47B648`](https://basescan.org/address/0x9AfFc874A3DCd94DF5Bd6eB23d4f48687f47B648) |
 | Uniswap v4 PoolManager | [`0x498581fF718922c3f8e6A244956aF099B2652b2b`](https://basescan.org/address/0x498581fF718922c3f8e6A244956aF099B2652b2b) |
 
-Deployed at block 59684172. Addresses are also in [`contracts/deployments/8453.json`](contracts/deployments/8453.json).
+v2, deployed at block 59736515. The original v1 contracts are listed in [`contracts/deployments/8453-v1.json`](contracts/deployments/8453-v1.json). Addresses are also in [`contracts/deployments/8453.json`](contracts/deployments/8453.json).
 
 > **Warning:** The contracts have not been audited. Only trade what you can afford to lose.
 

@@ -1,0 +1,8 @@
+{
+  "chainId": 8453,
+  "factory": "0xDC802747d6c5271e2fC8a51bc52D279bDb80b463",
+  "hook": "0xD7aDF63eDeb2e784bb949d9f848f9aE2D104A8Cc",
+  "poolManager": "0x498581fF718922c3f8e6A244956aF099B2652b2b",
+  "router": "0x9AfFc874A3DCd94DF5Bd6eB23d4f48687f47B648",
+  "startBlock": 59730722
+}

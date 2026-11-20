@@ -2,18 +2,23 @@
 pragma solidity 0.8.26;
 
 import {ERC20} from "solmate/src/tokens/ERC20.sol";
+import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 
 /// @notice Fixed-supply token: the whole supply is minted once, there is no owner, mint, tax or pause.
-/// When launched with the holders fee route it also pays ETH rewards to every holder pro rata
+/// With holder rewards on, it pays its share of trading fees, in the pair asset, to every holder pro rata
 /// (pool, hook, factory and burn address excluded).
 contract LaunchToken is ERC20 {
+    using SafeTransferLib for ERC20;
+
     error NotHook();
-    error PayoutFailed();
+    error BadValue();
 
     uint256 internal constant MAG = 2 ** 128;
     uint256 internal constant MIN_SHARES = 1 ether;
 
     address public immutable hook;
+    /// @dev Asset rewards are paid in. address(0) is native ETH.
+    address public immutable pair;
     bool public immutable holderRewards;
 
     mapping(address => bool) public excluded;
@@ -33,10 +38,12 @@ contract LaunchToken is ERC20 {
         uint256 supply,
         address recipient,
         address hook_,
+        address pair_,
         bool holderRewards_,
         address[] memory excluded_
     ) ERC20(name_, symbol_, 18) {
         hook = hook_;
+        pair = pair_;
         holderRewards = holderRewards_;
         for (uint256 i; i < excluded_.length; ++i) {
             excluded[excluded_[i]] = true;
@@ -75,17 +82,19 @@ contract LaunchToken is ERC20 {
         return excluded[a] ? 0 : balanceOf[a];
     }
 
-    /// @notice ETH earned by `a` and not yet claimed (excludes fees still sitting in the hook).
+    /// @notice Rewards earned by `a` and not yet claimed (excludes fees still sitting in the hook).
     function claimable(address a) public view returns (uint256) {
         if (!holderRewards) return 0;
         uint256 total = uint256(int256(magPerShare * sharesOf(a)) + corrections[a]) / MAG;
         return total - withdrawn[a];
     }
 
-    /// @notice Called by the hook with the holders' share of trading fees.
-    function distribute() external payable {
+    /// @notice Called by the hook with the holders' share of trading fees, already sent to this contract
+    /// (ERC-20 pairs) or attached as value (ETH pair).
+    function distribute(uint256 amount) external payable {
         if (msg.sender != hook) revert NotHook();
-        uint256 amount = msg.value + undistributed;
+        if (pair == address(0) ? msg.value != amount : msg.value != 0) revert BadValue();
+        amount += undistributed;
         if (amount == 0) return;
         if (totalShares < MIN_SHARES) {
             undistributed = amount;
@@ -103,8 +112,8 @@ contract LaunchToken is ERC20 {
         amount = claimable(holder);
         if (amount == 0) return 0;
         withdrawn[holder] += amount;
-        (bool ok,) = holder.call{value: amount}("");
-        if (!ok) revert PayoutFailed();
+        if (pair == address(0)) SafeTransferLib.safeTransferETH(holder, amount);
+        else ERC20(pair).safeTransfer(holder, amount);
         emit RewardsClaimed(holder, amount);
     }
 

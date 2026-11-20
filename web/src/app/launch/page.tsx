@@ -2,20 +2,18 @@
 /* eslint-disable @next/next/no-img-element */
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { isAddress, parseEther, parseEventLogs } from "viem";
+import { encodeAbiParameters, erc20Abi, getContractAddress, isAddress, keccak256, maxUint256, parseEventLogs, parseUnits, toHex } from "viem";
 import { useQuery } from "@tanstack/react-query";
-import { useAccount, useBalance, useWriteContract } from "wagmi";
+import { useAccount, useBalance, usePublicClient, useWriteContract } from "wagmi";
 import { launchFactoryAbi } from "@/lib/abis";
 import { api, saveMetadata, uploadImage, type Stats } from "@/lib/api";
-import { ADDR, chain, DEPLOYED, FEE_TIERS, SUPPLY_TIERS } from "@/lib/config";
+import { ADDR, chain, DEPLOYED, launchCap, PAIRS, platformBpsFor, SUPPLY_TIERS } from "@/lib/config";
 import { fmtEth, fmtPrice, fmtUsd } from "@/lib/format";
 import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
 
 const input =
   "h-12 w-full rounded-2xl border border-line bg-panel px-4 text-sm outline-none placeholder:text-dim focus:border-accent/60";
 
-// Every supply tier starts at the same market cap: tokens per ETH at the factory's start tick (200200).
-const START_CAP_ETH = 1e9 / Math.pow(1.0001, 200200);
 
 function Section({ n, title, sub, children }: { n: number; title: string; sub?: string; children: React.ReactNode }) {
   return (
@@ -98,24 +96,41 @@ export default function LaunchPage() {
   const [telegram, setTelegram] = useState("");
   const [discord, setDiscord] = useState("");
   const [tier, setTier] = useState(0);
-  const [feeBps, setFeeBps] = useState(100);
-  const [route, setRoute] = useState<"creator" | "holders" | "split">("creator");
+  const [pairIdx, setPairIdx] = useState(0);
+  const [buyBps, setBuyBps] = useState(300);
+  const [sellBps, setSellBps] = useState(300);
+  const [alloc, setAlloc] = useState({ creator: 100, holders: 0, burn: 0 });
+  const [split, setSplitMode] = useState(false);
   const [splits, setSplits] = useState<Split[]>([{ address: "", pct: "50" }, { address: "", pct: "50" }]);
   const [antiSnipe, setAntiSnipe] = useState(true);
+  const [editable, setEditable] = useState(true);
+  const [vanity, setVanity] = useState("");
   const [buy, setBuy] = useState("");
   const [step, setStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const client = usePublicClient({ chainId: chain.id });
 
-  const fee = FEE_TIERS.find((f) => f.bps === feeBps)!;
-  const routePct = (fee.bps - fee.platformBps) / 100;
-  const buyEth = Number(buy || 0);
+  const pair = PAIRS[pairIdx];
+  const native = pair.symbol === "ETH";
+  const allocTotal = alloc.creator + alloc.holders + alloc.burn;
+  const buyAmt = Number(buy || 0);
   const splitTotal = splits.reduce((a, s) => a + Number(s.pct || 0), 0);
   const splitOk =
-    route !== "split" ||
+    alloc.creator === 0 ||
+    !split ||
     (splits.every((s) => isAddress(s.address) && Number(s.pct) > 0) &&
       Math.abs(splitTotal - 100) < 1e-9 &&
       new Set(splits.map((s) => s.address.toLowerCase())).size === splits.length);
-  const valid = name.trim().length > 0 && name.length <= 32 && /^[A-Za-z0-9]{1,10}$/.test(symbol) && buyEth >= 0 && splitOk;
+  const valid =
+    name.trim().length > 0 && name.length <= 32 && /^[A-Za-z0-9]{1,10}$/.test(symbol) && buyAmt >= 0 && allocTotal === 100 && splitOk;
+  const allocLabel =
+    [alloc.creator && `${alloc.creator}% creator`, alloc.holders && `${alloc.holders}% holders`, alloc.burn && `${alloc.burn}% burn`]
+      .filter(Boolean)
+      .join(" · ") || "–";
+
+  function setShare(k: keyof typeof alloc, v: number) {
+    setAlloc((a) => ({ ...a, [k]: Math.max(0, Math.min(100, Math.round(v))) }));
+  }
 
   function pickFile(f: File | null) {
     setError(null);
@@ -129,9 +144,26 @@ export default function LaunchPage() {
     setSplits((s) => s.map((v, j) => (j === i ? { ...v, ...patch } : v)));
   }
 
+  /** Finds a CREATE2 salt whose token address sorts above the pair asset and ends with the vanity suffix. */
+  async function mineSalt(account: `0x${string}`, initHash: `0x${string}`) {
+    const want = vanity.toLowerCase();
+    const pairN = BigInt(pair.address);
+    const start = BigInt(Math.floor(Math.random() * 2 ** 48)) << 32n;
+    for (let i = 0; ; i++) {
+      const salt = toHex(start + BigInt(i), { size: 32 });
+      const s = keccak256(encodeAbiParameters([{ type: "address" }, { type: "bytes32" }], [account, salt]));
+      const addr = getContractAddress({ opcode: "CREATE2", from: ADDR.factory, salt: s, bytecodeHash: initHash });
+      if (BigInt(addr) > pairN && (!want || addr.toLowerCase().endsWith(want))) return salt;
+      if (i % 2000 === 1999) {
+        setStep(`Finding your address… ${(i + 1).toLocaleString()} tries`);
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!valid || step) return;
+    if (!valid || step || !client) return;
     setError(null);
     try {
       setStep("Connecting wallet…");
@@ -148,10 +180,25 @@ export default function LaunchPage() {
       const builder = (qs || localStorage.getItem("keel-ref") || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 24);
       if (builder.length >= 3) meta.builder = builder;
       const uri = await saveMetadata(Object.fromEntries(Object.entries(meta).filter(([, v]) => v.trim())));
-      const recipients =
-        route === "holders" ? [] : route === "creator" ? [account] : splits.map((s) => s.address as `0x${string}`);
-      const bps = route === "split" ? splits.map((s) => Math.round(Number(s.pct) * 100)) : route === "creator" ? [10_000] : [];
-      if (route === "split") bps[bps.length - 1] += 10_000 - bps.reduce((a, b) => a + b, 0);
+      const recipients = alloc.creator === 0 ? [] : split ? splits.map((s) => s.address as `0x${string}`) : [account];
+      const bps = alloc.creator === 0 ? [] : split ? splits.map((s) => Math.round(Number(s.pct) * 100)) : [10_000];
+      if (alloc.creator > 0 && split) bps[bps.length - 1] += 10_000 - bps.reduce((a, b) => a + b, 0);
+      const devBuy = buy ? parseUnits(buy, pair.decimals) : 0n;
+      if (!native && devBuy > 0n) {
+        const allowance = await client.readContract({ address: pair.address, abi: erc20Abi, functionName: "allowance", args: [account, ADDR.factory] });
+        if (allowance < devBuy) {
+          setStep(`Approve ${pair.symbol} in wallet…`);
+          await confirm(await writeContractAsync({ address: pair.address, abi: erc20Abi, functionName: "approve", args: [ADDR.factory, maxUint256], chainId: chain.id }));
+        }
+      }
+      setStep("Finding your address…");
+      const tokenName = name.trim();
+      const tokenSymbol = symbol.toUpperCase();
+      const initHash = await client.readContract({
+        address: ADDR.factory, abi: launchFactoryAbi, functionName: "tokenInitCodeHash",
+        args: [tokenName, tokenSymbol, tier, pair.address, alloc.holders > 0],
+      });
+      const salt = await mineSalt(account, initHash);
       setStep("Confirm in wallet…");
       const hash = await writeContractAsync({
         address: ADDR.factory,
@@ -159,19 +206,26 @@ export default function LaunchPage() {
         functionName: "launch",
         args: [
           {
-            name: name.trim(),
-            symbol: symbol.toUpperCase(),
+            name: tokenName,
+            symbol: tokenSymbol,
             metadataURI: uri,
             supplyTier: tier,
-            feeBps,
+            pair: pair.address,
+            buyBps,
+            sellBps,
+            creatorBps: alloc.creator * 100,
+            holdersBps: alloc.holders * 100,
+            burnBps: alloc.burn * 100,
             antiSnipe,
-            holders: route === "holders",
+            editable,
             recipients,
             shares: bps,
+            salt,
+            devBuy,
             minTokensOut: 0n,
           },
         ],
-        value: parseEther(buy || "0"),
+        value: native ? devBuy : 0n,
         chainId: chain.id,
       });
       setStep("Launching…");
@@ -184,14 +238,16 @@ export default function LaunchPage() {
     }
   }
 
-  const routeLabel = route === "holders" ? "Holders" : route === "creator" ? "You" : `${splits.length} wallets`;
 
   const [devBuy, setDevBuy] = useState(false);
   const stats = useQuery({ queryKey: ["stats"], queryFn: () => api<Stats>("/stats"), refetchInterval: 60_000 });
   const ethUsd = stats.data?.ethUsd ?? 0;
   const supply = SUPPLY_TIERS[tier];
-  const startPriceEth = START_CAP_ETH / supply;
-  const usd = (eth: number) => (ethUsd > 0 ? fmtUsd(eth * ethUsd) : null);
+  const cap = launchCap(pair);
+  const startPriceEth = cap / supply;
+  const pairUsd = native ? ethUsd : pair.symbol === "USDC" ? 1 : pair.symbol === "cbBTC" ? (stats.data?.btcUsd ?? 0) : (pair.usd ?? 0);
+  const usd = (v: number) => (pairUsd > 0 ? fmtUsd(v * pairUsd) : null);
+  const capLabel = `${cap.toLocaleString(undefined, { maximumSignificantDigits: 4 })} ${pair.symbol}`;
 
   return (
     <div className="mx-auto max-w-7xl pt-8 sm:pt-12">
@@ -222,12 +278,42 @@ export default function LaunchPage() {
                     <input className={`${input} uppercase`} value={symbol} maxLength={10} onChange={(e) => setSymbol(e.target.value.replace(/[^A-Za-z0-9]/g, ""))} placeholder="TOKEN" />
                   </Field>
                 </div>
-                <Field label="Paired asset *">
-                  <div className={`${input} flex items-center gap-2.5`}>
-                    <img src="https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg" alt="" className="h-6 w-6 rounded-full" />
-                    <span className="font-medium">ETH</span>
-                    <span className="ml-auto rounded-full bg-panel-2 px-2.5 py-0.5 text-xs text-muted">Uniswap v4</span>
+                <Field label="Paired asset *" hint="Uniswap v4">
+                  <div className="grid grid-cols-3 gap-2">
+                    {PAIRS.slice(0, 3).map((pr, i) => (
+                      <button
+                        key={pr.symbol}
+                        type="button"
+                        onClick={() => {
+                          setPairIdx(i);
+                          setBuy("");
+                        }}
+                        className={`flex h-12 items-center justify-center gap-2 rounded-2xl border text-sm font-medium transition-colors ${
+                          pairIdx === i ? "border-accent bg-accent/10" : "border-line bg-panel text-muted hover:border-line-2"
+                        }`}
+                      >
+                        <img src={pr.logo} alt="" className="h-5 w-5 rounded-full" />
+                        {pr.symbol}
+                      </button>
+                    ))}
                   </div>
+                  <select
+                    value={pairIdx >= 3 ? String(pairIdx) : ""}
+                    onChange={(e) => {
+                      setPairIdx(Number(e.target.value));
+                      setBuy("");
+                    }}
+                    className={`mt-2 h-12 w-full rounded-2xl border bg-panel px-4 text-sm outline-none ${pairIdx >= 3 ? "border-accent" : "border-line text-muted"}`}
+                  >
+                    <option value="" disabled>
+                      Or pair with a tokenized stock ({PAIRS.length - 3})
+                    </option>
+                    {PAIRS.slice(3).map((pr, i) => (
+                      <option key={pr.address} value={i + 3}>
+                        {pr.symbol} · {pr.name}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
                 <details className="group rounded-2xl border border-line bg-panel" open>
                   <summary className="flex h-12 cursor-pointer list-none items-center gap-2 px-4 text-sm font-medium">
@@ -267,53 +353,99 @@ export default function LaunchPage() {
             </div>
           </Section>
 
-          <Section n={2} title="Token Taxes" sub={`The trade fee applies to every buy and sell through the launch pool and includes the protocol fee. It is paid in ETH and fixed at launch. Ordinary wallet transfers are untaxed.`}>
+          <Section n={2} title="Token Taxes" sub={`Tax applies to buys and sells through the launch pool and includes the protocol fee. It is paid in ${pair.symbol} and fixed at launch. Ordinary wallet transfers are untaxed.`}>
             <div className="space-y-6">
-              <Field label="Trade fee" hint={`protocol takes ${fee.platformBps / 100}% of it`}>
-                <Pills value={feeBps} onChange={setFeeBps} options={FEE_TIERS.map((f) => ({ v: f.bps, label: `${f.bps / 100}%`, sub: `${(f.bps - f.platformBps) / 100}% to you` }))} />
-              </Field>
-              <Field label="Tax allocation" hint={`${routePct}% of each trade after protocol`}>
-                <Pills
-                  value={route}
-                  onChange={setRoute}
-                  options={[
-                    { v: "creator", label: "Creator funds", sub: "your wallet" },
-                    { v: "holders", label: "Holder dividends", sub: "ETH, pro-rata" },
-                    { v: "split", label: "Split wallets", sub: "up to 4 wallets" },
-                  ]}
-                />
-              </Field>
-              {route === "creator" && (
-                <div className="rounded-2xl border border-line bg-panel p-4 text-sm">
-                  <p className="font-medium">Creator funds recipient</p>
-                  <p className="mt-1 font-mono text-xs text-muted">{address ?? "Your connected wallet"}</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {(
+                  [
+                    ["Buy tax", buyBps, setBuyBps],
+                    ["Sell tax", sellBps, setSellBps],
+                  ] as const
+                ).map(([label, v, set]) => (
+                  <div key={label} className="rounded-2xl border border-line bg-panel p-4">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm font-medium">{label}</span>
+                      <span className="font-mono text-lg">{v / 100}%</span>
+                    </div>
+                    <input type="range" min={100} max={1000} step={50} value={v} onChange={(e) => set(Number(e.target.value))} className="mt-3 w-full accent-[#3d7bff]" />
+                    <div className="mt-1 flex justify-between text-[11px] text-dim">
+                      <span>1%</span>
+                      <span>protocol {platformBpsFor(v) / 100}% included</span>
+                      <span>10%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div className="mb-2 flex items-baseline justify-between">
+                  <span className="text-sm font-medium">Tax allocation</span>
+                  <span className={`text-xs ${allocTotal === 100 ? "text-dim" : "text-down"}`}>
+                    {allocTotal === 100 ? "fully allocated" : `${100 - allocTotal}% left to allocate`}
+                  </span>
                 </div>
-              )}
-              {route === "holders" && (
-                <p className="text-sm leading-relaxed text-muted">{routePct}% of every trade is paid in ETH to everyone holding the token, pro-rata to their balance. Holders claim anytime.</p>
-              )}
-              {route === "split" && (
-                <div className="space-y-2">
-                  {splits.map((sp, i) => (
-                    <div key={i} className="flex gap-2">
-                      <input className={`${input} font-mono text-xs`} value={sp.address} onChange={(e) => setSplit(i, { address: e.target.value.trim() })} placeholder="0x… wallet" />
-                      <div className="relative w-24 shrink-0">
-                        <input className={`${input} pr-7 font-mono`} inputMode="decimal" value={sp.pct} onChange={(e) => setSplit(i, { pct: e.target.value.replace(/[^0-9.]/g, "") })} />
-                        <span className="absolute top-3.5 right-3 text-xs text-dim">%</span>
+                <div className="space-y-3">
+                  {(
+                    [
+                      ["creator", "Creator funds", "To your wallet, or split between up to 4 wallets"],
+                      ["holders", "Holder dividends", `Paid in ${pair.symbol} to every holder, pro-rata`],
+                      ["burn", "Burn allocation", "Buys the token back from the pool and burns it"],
+                    ] as const
+                  ).map(([k, label, sub]) => (
+                    <div key={k} className="rounded-2xl border border-line bg-panel p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{label}</p>
+                          <p className="text-xs text-dim">{sub}</p>
+                        </div>
+                        <div className="relative w-20 shrink-0">
+                          <input
+                            className="h-10 w-full rounded-xl border border-line bg-bg px-3 pr-7 text-right font-mono text-sm outline-none focus:border-accent/60"
+                            inputMode="numeric"
+                            value={alloc[k]}
+                            onChange={(e) => setShare(k, Number(e.target.value.replace(/[^0-9]/g, "") || 0))}
+                          />
+                          <span className="absolute top-2.5 right-3 text-xs text-dim">%</span>
+                        </div>
                       </div>
-                      {splits.length > 2 && (
-                        <button type="button" className="px-1 text-dim hover:text-down" onClick={() => setSplits(splits.filter((_, j) => j !== i))}>×</button>
-                      )}
+                      <input type="range" min={0} max={100} step={5} value={alloc[k]} onChange={(e) => setShare(k, Number(e.target.value))} className="mt-3 w-full accent-[#3d7bff]" />
                     </div>
                   ))}
-                  <div className="flex justify-between text-xs">
-                    {splits.length < 4 ? (
-                      <button type="button" className="text-accent hover:underline" onClick={() => setSplits([...splits, { address: "", pct: "0" }])}>+ Add wallet</button>
-                    ) : (
-                      <span />
-                    )}
-                    <span className={Math.abs(splitTotal - 100) < 1e-9 ? "text-dim" : "text-down"}>total {splitTotal}%</span>
+                </div>
+              </div>
+              {alloc.creator > 0 && (
+                <div className="rounded-2xl border border-line bg-panel p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">Creator funds recipient</p>
+                    <button type="button" onClick={() => setSplitMode(!split)} className="text-xs text-accent hover:underline">
+                      {split ? "Use my wallet" : "Split between wallets"}
+                    </button>
                   </div>
+                  {!split ? (
+                    <p className="mt-1 font-mono text-xs break-all text-muted">{address ?? "Your connected wallet"}</p>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      {splits.map((sp, i) => (
+                        <div key={i} className="flex gap-2">
+                          <input className={`${input} bg-bg font-mono text-xs`} value={sp.address} onChange={(e) => setSplit(i, { address: e.target.value.trim() })} placeholder="0x… wallet" />
+                          <div className="relative w-24 shrink-0">
+                            <input className={`${input} bg-bg pr-7 font-mono`} inputMode="decimal" value={sp.pct} onChange={(e) => setSplit(i, { pct: e.target.value.replace(/[^0-9.]/g, "") })} />
+                            <span className="absolute top-3.5 right-3 text-xs text-dim">%</span>
+                          </div>
+                          {splits.length > 2 && (
+                            <button type="button" className="px-1 text-dim hover:text-down" onClick={() => setSplits(splits.filter((_, j) => j !== i))}>×</button>
+                          )}
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-xs">
+                        {splits.length < 4 ? (
+                          <button type="button" className="text-accent hover:underline" onClick={() => setSplits([...splits, { address: "", pct: "0" }])}>+ Add wallet</button>
+                        ) : (
+                          <span />
+                        )}
+                        <span className={Math.abs(splitTotal - 100) < 1e-9 ? "text-dim" : "text-down"}>total {splitTotal}%</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -324,22 +456,39 @@ export default function LaunchPage() {
               <Toggle on={devBuy} set={(v) => { setDevBuy(v); if (!v) setBuy(""); }} label="Include Dev Buy" sub="Buy tokens as part of the launch, in the same transaction. Tax-free." />
               {devBuy && (
                 <div className="rounded-2xl border border-line bg-panel p-4">
-                  <Field label="Amount" hint={bal ? `balance ${fmtEth(Number(bal.formatted))}` : undefined}>
+                  <Field label={`Amount (${pair.symbol})`} hint={native && bal ? `balance ${fmtEth(Number(bal.formatted))}` : undefined}>
                     <div className="relative">
                       <input className={`${input} bg-bg pr-14 font-mono`} inputMode="decimal" value={buy} onChange={(e) => setBuy(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.0" />
-                      <span className="absolute top-3.5 right-4 text-xs text-dim">ETH</span>
+                      <span className="absolute top-3.5 right-4 text-xs text-dim">{pair.symbol}</span>
                     </div>
                   </Field>
                   <div className="mt-2 flex gap-2">
-                    {["0.01", "0.05", "0.1", "0.5"].map((v) => (
+                    {pair.presets.map((v) => (
                       <button key={v} type="button" onClick={() => setBuy(v)} className="rounded-lg border border-line px-2.5 py-1 font-mono text-xs text-muted hover:text-fg">{v}</button>
                     ))}
                   </div>
                 </div>
               )}
               <Toggle on={antiSnipe} set={setAntiSnipe} label="Enable anti-sniping" sub="Buys start with a 90% fee that drops to 0 over 60 seconds. The dev buy skips it." />
+              <Toggle on={editable} set={setEditable} label="Metadata editable after launch" sub="Let the creator update the image, description and links later. Turn off to lock them forever." />
+              <div className="rounded-2xl border border-line bg-panel p-4">
+                <p className="text-sm font-medium">
+                  Vanity address <span className="text-xs font-normal text-dim">(optional)</span>
+                </p>
+                <p className="text-xs text-dim">Token address ending in up to 4 hex characters, found in your browser before you confirm.</p>
+                <div className="mt-3 flex h-11 items-center gap-1 rounded-xl border border-line bg-bg px-3 font-mono text-sm">
+                  <span className="text-muted">0x…</span>
+                  <input
+                    value={vanity}
+                    maxLength={4}
+                    onChange={(e) => setVanity(e.target.value.replace(/[^0-9a-fA-F]/g, "").toLowerCase())}
+                    placeholder="beef"
+                    className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-dim"
+                  />
+                </div>
+              </div>
             </div>
-            <p className="mt-5 text-xs leading-relaxed text-dim">The token and its Uniswap v4 market go live together, priced in ETH. The fixed supply is minted once and seeded into a pool whose liquidity stays locked forever.</p>
+            <p className="mt-5 text-xs leading-relaxed text-dim">The token and its Uniswap v4 market go live together, priced in {pair.symbol}. The fixed supply is minted once and seeded into a pool whose liquidity stays locked forever.</p>
           </Section>
         </div>
 
@@ -354,7 +503,7 @@ export default function LaunchPage() {
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-lg font-semibold">{name || "Your token"}</p>
-                <p className="text-sm text-muted">{(symbol || "TOKEN").toUpperCase()}/ETH</p>
+                <p className="text-sm text-muted">{(symbol || "TOKEN").toUpperCase()}/{pair.symbol}</p>
               </div>
               <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">NEW</span>
             </div>
@@ -362,17 +511,17 @@ export default function LaunchPage() {
             <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-xs text-muted">Start price</p>
-                <p className="mt-1 font-medium">≈ {usd(startPriceEth) ?? `${fmtPrice(startPriceEth)} ETH`}</p>
-                <p className="mt-0.5 text-xs text-dim">{fmtPrice(startPriceEth)} ETH</p>
+                <p className="mt-1 font-medium">≈ {usd(startPriceEth) ?? `${fmtPrice(startPriceEth)} ${pair.symbol}`}</p>
+                <p className="mt-0.5 text-xs text-dim">{fmtPrice(startPriceEth)} {pair.symbol}</p>
               </div>
               <div>
                 <p className="text-xs text-muted">Launch cap</p>
-                <p className="mt-1 font-medium">≈ {usd(START_CAP_ETH) ?? fmtEth(START_CAP_ETH)}</p>
-                <p className="mt-0.5 text-xs text-dim">{START_CAP_ETH.toFixed(4)} ETH</p>
+                <p className="mt-1 font-medium">≈ {usd(cap) ?? capLabel}</p>
+                <p className="mt-0.5 text-xs text-dim">{capLabel}</p>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <span className="flex items-center gap-1.5 rounded-full bg-panel-2 px-2.5 py-1 text-xs"><img src="https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg" alt="" className="h-4 w-4 rounded-full" />ETH</span>
+              <span className="flex items-center gap-1.5 rounded-full bg-panel-2 px-2.5 py-1 text-xs"><img src={pair.logo} alt="" className="h-4 w-4 rounded-full" />{pair.symbol}</span>
               <span className="rounded-full bg-up/15 px-2.5 py-1 text-xs text-up">LP locked</span>
               {antiSnipe && <span className="rounded-full bg-panel-2 px-2.5 py-1 text-xs text-muted">Anti-snipe</span>}
             </div>
@@ -384,12 +533,14 @@ export default function LaunchPage() {
                 [
                   ["Fixed supply", SUPPLY_LABELS[tier]],
                   ["Pool model", "Locked pool"],
-                  ["Launch market cap", `≈ ${usd(START_CAP_ETH) ?? fmtEth(START_CAP_ETH)}`],
-                  ["Trade fee", `${feeBps / 100}%`],
-                  [`→ ${routeLabel}`, `${routePct}%`],
-                  ["→ Protocol", `${fee.platformBps / 100}%`],
-                  ["Dev buy", buyEth ? `${buyEth} ETH` : "None"],
-                  ["Paired asset", "ETH"],
+                  ["Launch market cap", `≈ ${usd(cap) ?? capLabel}`],
+                  ["Buy / sell tax", `${buyBps / 100}% / ${sellBps / 100}%`],
+                  ["Protocol (included)", `${platformBpsFor(buyBps) / 100}% / ${platformBpsFor(sellBps) / 100}%`],
+                  ["Allocation", allocLabel],
+                  ["Dev buy", buyAmt ? `${buyAmt} ${pair.symbol}` : "None"],
+                  ["Paired asset", pair.symbol],
+                  ["Token address", vanity ? `0x…${vanity}` : "random"],
+                  ["Metadata", editable ? "editable" : "locked"],
                 ] as const
               ).map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-4">
@@ -403,7 +554,8 @@ export default function LaunchPage() {
             </button>
             <p className="mt-3 text-center text-xs text-dim">You&apos;ll confirm the transaction in your wallet. Nothing is minted until you submit.</p>
             {error && <p className="mt-3 text-xs text-down">{error}</p>}
-            {route === "split" && !splitOk && <p className="mt-3 text-xs text-dim">Split needs unique valid wallets totaling 100%.</p>}
+            {!splitOk && <p className="mt-3 text-xs text-dim">Split needs unique valid wallets totaling 100%.</p>}
+            {allocTotal !== 100 && <p className="mt-3 text-xs text-down">Tax allocation must add up to 100%.</p>}
           </div>
         </aside>
       </form>

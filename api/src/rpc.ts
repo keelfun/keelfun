@@ -9,12 +9,33 @@ export type RpcLog = {
 
 export class Rpc {
   private id = 0;
-  constructor(private url: string) {}
+  private urls: string[];
+  private current = 0;
+  /** `url` may be a comma-separated list; failing endpoints (rate limits, range limits) fall through to the next. */
+  constructor(url: string) {
+    this.urls = url.split(",").map((u) => u.trim()).filter(Boolean);
+  }
 
   async batch<T = unknown>(calls: { method: string; params: unknown[] }[]): Promise<T[]> {
     if (calls.length === 0) return [];
+    let last: unknown;
+    for (let n = 0; n < this.urls.length; n++) {
+      const idx = (this.current + n) % this.urls.length;
+      try {
+        const out = await this.batchOn<T>(this.urls[idx], calls);
+        this.current = idx;
+        return out;
+      } catch (e) {
+        last = e;
+      }
+    }
+    throw last;
+  }
+
+  private async batchOn<T>(url: string, calls: { method: string; params: unknown[] }[]): Promise<T[]> {
     const body = calls.map((c) => ({ jsonrpc: "2.0", id: ++this.id, method: c.method, params: c.params }));
-    const res = await fetch(this.url, {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(15_000),
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),

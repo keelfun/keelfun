@@ -6,6 +6,7 @@ import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {IUnlockCallback} from "v4-core/src/interfaces/callback/IUnlockCallback.sol";
 import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
+import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {BalanceDelta, BalanceDeltaLibrary} from "v4-core/src/types/BalanceDelta.sol";
@@ -15,10 +16,11 @@ import {ModifyLiquidityParams, SwapParams} from "v4-core/src/types/PoolOperation
 import {Owned} from "solmate/src/auth/Owned.sol";
 import {LaunchToken} from "./LaunchToken.sol";
 
-/// @notice Fee + anti-snipe hook for launchpad pools (native ETH / token).
-/// Charges the creator-chosen trading fee in ETH on every swap. The platform keeps a fixed slice; the rest goes
-/// to the token's fee route: every holder pro rata, or one to four fixed wallets.
-/// Optional anti-snipe adds a tax on buys that decays to zero over the first minute; it follows the fee route.
+/// @notice Tax + anti-snipe hook for launchpad pools (pair asset / token, pair asset is currency0).
+/// Charges the creator-chosen buy and sell tax in the pair asset on every swap. The protocol keeps a slice;
+/// the rest is split between creator wallets (one to four), every holder pro rata, and burns.
+/// Burn fees accumulate and anyone can trigger `burn`, which buys the token in its own pool and sends it to the
+/// dead address. Optional anti-snipe adds a tax on buys that decays to zero over the first minute.
 /// Only the factory can create pools and add liquidity, and nobody can remove it.
 contract LaunchHook is IHooks, IUnlockCallback, Owned {
     using PoolIdLibrary for PoolKey;
@@ -36,44 +38,68 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
     error InvalidRoute();
     error ZeroAddress();
 
+    struct Config {
+        uint16 buyBps;
+        uint16 sellBps;
+        uint16 creatorBps;
+        uint16 holdersBps;
+        uint16 burnBps;
+        bool antiSnipe;
+    }
+
     struct PoolInfo {
         address token;
         address creator;
+        Currency pair;
         uint40 launchedAt;
-        uint16 feeBps;
-        uint16 platformBps;
+        uint16 buyBps;
+        uint16 sellBps;
+        uint16 buyPlatformBps;
+        uint16 sellPlatformBps;
+        uint16 creatorBps;
+        uint16 holdersBps;
+        uint16 burnBps;
         bool antiSnipe;
-        bool holders;
         uint256 supply;
     }
 
     uint256 public constant BPS = 10_000;
+    uint256 public constant MIN_TAX_BPS = 100;
+    uint256 public constant MAX_TAX_BPS = 1_000;
     uint256 public constant MAX_TOTAL_BPS = 9_900;
     uint256 public constant SNIPE_START_BPS = 9_000;
     uint256 public constant SNIPE_WINDOW = 60;
     uint256 public constant MAX_RECIPIENTS = 4;
+    address public constant DEAD = 0x000000000000000000000000000000000000dEaD;
+    uint8 internal constant PAY = 0;
+    uint8 internal constant BURN = 1;
 
     IPoolManager public immutable poolManager;
     address public factory;
 
     mapping(PoolId => PoolInfo) public pools;
     mapping(address token => PoolId) public poolIdOf;
+    mapping(address token => PoolKey) internal _keys;
     mapping(address token => address[]) internal _recipients;
     mapping(address token => uint16[]) internal _shares;
     mapping(address token => mapping(address recipient => uint256)) public accrued;
     mapping(address token => uint256) public holdersPending;
+    mapping(address token => uint256) public burnPending;
     mapping(address token => uint256) public routeEarned;
     mapping(address => bool) public trustedRouter;
-    uint256 public platformAccrued;
+    /// @dev Keyed by pair asset (address(0) = ETH).
+    mapping(address pair => uint256) public platformAccrued;
 
     event FactorySet(address factory);
     event RouterTrusted(address router, bool trusted);
-    event RouteSet(address indexed token, bool holders, address[] recipients, uint16[] shares);
+    event RouteSet(
+        address indexed token, uint16 creatorBps, uint16 holdersBps, uint16 burnBps, address[] recipients, uint16[] shares
+    );
     event Trade(
         address indexed token,
         address indexed trader,
         bool isBuy,
-        uint256 ethAmount,
+        uint256 pairAmount,
         uint256 tokenAmount,
         uint256 platformFee,
         uint256 creatorFee,
@@ -81,7 +107,8 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
     );
     event FeesClaimed(address indexed token, address indexed recipient, uint256 amount);
     event HoldersFlushed(address indexed token, uint256 amount);
-    event PlatformFeesWithdrawn(address indexed to, uint256 amount);
+    event Burned(address indexed token, uint256 pairAmount, uint256 tokensBurned);
+    event PlatformFeesWithdrawn(address indexed pair, address indexed to, uint256 amount);
     event RecipientChanged(address indexed token, address indexed from, address indexed to);
 
     constructor(IPoolManager _poolManager, address _owner) Owned(_owner) {
@@ -129,14 +156,11 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
         emit RouterTrusted(router, trusted);
     }
 
-    /// @notice Platform slice of each fee tier (bps of the trade).
-    function platformBpsFor(uint256 feeBps) public pure returns (uint16) {
-        if (feeBps == 100) return 40;
-        if (feeBps == 200) return 50;
-        if (feeBps == 300) return 60;
-        if (feeBps == 500) return 75;
-        if (feeBps == 1000) return 100;
-        revert InvalidFee();
+    /// @notice Protocol slice (bps of the trade) of a 1%-10% tax: 0.4% at 1%, +0.1% per extra 1%, capped at 1%.
+    function platformBpsFor(uint256 taxBps) public pure returns (uint16) {
+        if (taxBps < MIN_TAX_BPS || taxBps > MAX_TAX_BPS) revert InvalidFee();
+        uint256 p = 40 + (taxBps - MIN_TAX_BPS) / 10;
+        return uint16(p > 100 ? 100 : p);
     }
 
     function register(
@@ -144,15 +168,15 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
         address token,
         address creator,
         uint256 supply,
-        uint16 feeBps,
-        bool antiSnipe,
-        bool holders,
+        Config calldata c,
         address[] calldata recipients,
         uint16[] calldata shares
     ) external {
         if (msg.sender != factory) revert NotFactory();
-        uint16 platformBps = platformBpsFor(feeBps);
-        if (holders) {
+        if (uint256(c.creatorBps) + c.holdersBps + c.burnBps != BPS) revert InvalidRoute();
+        uint16 buyPlatform = platformBpsFor(c.buyBps);
+        uint16 sellPlatform = platformBpsFor(c.sellBps);
+        if (c.creatorBps == 0) {
             if (recipients.length != 0 || shares.length != 0) revert InvalidRoute();
         } else {
             uint256 n = recipients.length;
@@ -174,15 +198,21 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
         pools[id] = PoolInfo({
             token: token,
             creator: creator,
+            pair: key.currency0,
             launchedAt: uint40(block.timestamp),
-            feeBps: feeBps,
-            platformBps: platformBps,
-            antiSnipe: antiSnipe,
-            holders: holders,
+            buyBps: c.buyBps,
+            sellBps: c.sellBps,
+            buyPlatformBps: buyPlatform,
+            sellPlatformBps: sellPlatform,
+            creatorBps: c.creatorBps,
+            holdersBps: c.holdersBps,
+            burnBps: c.burnBps,
+            antiSnipe: c.antiSnipe,
             supply: supply
         });
         poolIdOf[token] = id;
-        emit RouteSet(token, holders, recipients, shares);
+        _keys[token] = key;
+        emit RouteSet(token, c.creatorBps, c.holdersBps, c.burnBps, recipients, shares);
     }
 
     // ---------------------------------------------------------------- views
@@ -194,15 +224,15 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
     function routeOf(address token)
         external
         view
-        returns (bool holders, address[] memory recipients, uint16[] memory shares)
+        returns (uint16 creatorBps, uint16 holdersBps, uint16 burnBps, address[] memory recipients, uint16[] memory shares)
     {
-        return (pools[poolIdOf[token]].holders, _recipients[token], _shares[token]);
+        PoolInfo storage p = pools[poolIdOf[token]];
+        return (p.creatorBps, p.holdersBps, p.burnBps, _recipients[token], _shares[token]);
     }
 
     /// @notice Extra tax on buys right after launch: 90% at launch, falling linearly to 0 after 60 seconds.
     function snipeTaxBps(address token) public view returns (uint256) {
-        PoolInfo storage p = pools[poolIdOf[token]];
-        return _snipe(p);
+        return _snipe(pools[poolIdOf[token]]);
     }
 
     function _snipe(PoolInfo storage p) internal view returns (uint256) {
@@ -212,7 +242,7 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
         return SNIPE_START_BPS * (SNIPE_WINDOW - elapsed) / SNIPE_WINDOW;
     }
 
-    /// @notice Fee rates (bps of the gross ETH moved) that a trade would pay right now.
+    /// @notice Tax rates (bps of the gross pair amount moved) that a trade would pay right now.
     function feeRates(address token, bool isBuy, address sender)
         public
         view
@@ -226,9 +256,15 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
         view
         returns (uint256 totalBps, uint256 platformBps)
     {
-        platformBps = p.platformBps;
-        totalBps = p.feeBps;
-        if (isBuy && sender != factory) totalBps += _snipe(p);
+        if (sender == address(this)) return (0, 0);
+        if (isBuy) {
+            totalBps = p.buyBps;
+            platformBps = p.buyPlatformBps;
+            if (sender != factory) totalBps += _snipe(p);
+        } else {
+            totalBps = p.sellBps;
+            platformBps = p.sellPlatformBps;
+        }
         if (totalBps > MAX_TOTAL_BPS) totalBps = MAX_TOTAL_BPS;
     }
 
@@ -258,7 +294,7 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
         if (p.token == address(0)) revert UnknownPool();
         bool isBuy = params.zeroForOne;
         bool exactIn = params.amountSpecified < 0;
-        // ETH is the specified side on exact-in buys and exact-out sells: take the fee before the swap.
+        // The pair asset is the specified side on exact-in buys and exact-out sells: take the fee before the swap.
         if (isBuy == exactIn) {
             (uint256 totalBps, uint256 platformBps) = _feeRates(p, isBuy, sender);
             uint256 amount = exactIn ? uint256(-params.amountSpecified) : uint256(params.amountSpecified);
@@ -284,7 +320,7 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
 
         int128 amount0 = delta.amount0();
         int128 amount1 = delta.amount1();
-        uint256 ethPool = uint256(uint128(amount0 < 0 ? -amount0 : amount0));
+        uint256 pairPool = uint256(uint128(amount0 < 0 ? -amount0 : amount0));
 
         uint256 fee;
         int128 hookDelta;
@@ -292,29 +328,31 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
             uint256 amount = exactIn ? uint256(-params.amountSpecified) : uint256(params.amountSpecified);
             fee = exactIn ? amount * totalBps / BPS : amount * totalBps / (BPS - totalBps);
         } else {
-            // ETH is unspecified: exact-out buys (ETH in) and exact-in sells (ETH out)
-            fee = isBuy ? ethPool * totalBps / (BPS - totalBps) : ethPool * totalBps / BPS;
+            // Pair asset is unspecified: exact-out buys (pair in) and exact-in sells (pair out)
+            fee = isBuy ? pairPool * totalBps / (BPS - totalBps) : pairPool * totalBps / BPS;
             _accrue(p, fee, totalBps, platformBps);
             hookDelta = int128(int256(fee));
         }
 
         uint256 tokenAmount;
-        uint256 ethAmount;
+        uint256 pairAmount;
         if (isBuy) {
             tokenAmount = uint256(uint128(amount1));
-            ethAmount = ethPool + fee;
+            pairAmount = pairPool + fee;
         } else {
             tokenAmount = uint256(uint128(-amount1));
-            ethAmount = ethPool - fee;
+            pairAmount = pairPool - fee;
         }
 
         address trader = tx.origin;
-        if ((sender == factory || trustedRouter[sender]) && hookData.length == 32) {
+        if (sender == address(this)) {
+            trader = DEAD;
+        } else if ((sender == factory || trustedRouter[sender]) && hookData.length == 32) {
             trader = abi.decode(hookData, (address));
         }
         (uint160 sqrtPriceX96,,,) = poolManager.getSlot0(id);
         uint256 platformFee = totalBps == 0 ? 0 : fee * platformBps / totalBps;
-        emit Trade(p.token, trader, isBuy, ethAmount, tokenAmount, platformFee, fee - platformFee, sqrtPriceX96);
+        emit Trade(p.token, trader, isBuy, pairAmount, tokenAmount, platformFee, fee - platformFee, sqrtPriceX96);
 
         return (IHooks.afterSwap.selector, hookDelta);
     }
@@ -323,33 +361,41 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
         if (fee == 0) return;
         uint256 platformFee = fee * platformBps / totalBps;
         uint256 routeFee = fee - platformFee;
-        platformAccrued += platformFee;
         address token = p.token;
+        platformAccrued[Currency.unwrap(p.pair)] += platformFee;
         routeEarned[token] += routeFee;
-        if (p.holders) {
-            holdersPending[token] += routeFee;
-        } else {
+        uint256 h = routeFee * p.holdersBps / BPS;
+        uint256 b = routeFee * p.burnBps / BPS;
+        uint256 c = routeFee - h - b;
+        if (p.creatorBps == 0) {
+            if (p.burnBps > 0) b += c;
+            else h += c;
+            c = 0;
+        }
+        if (h > 0) holdersPending[token] += h;
+        if (b > 0) burnPending[token] += b;
+        if (c > 0) {
             address[] storage r = _recipients[token];
             uint16[] storage s = _shares[token];
             uint256 n = r.length;
-            uint256 left = routeFee;
+            uint256 left = c;
             for (uint256 i; i < n - 1; ++i) {
-                uint256 part = routeFee * s[i] / BPS;
+                uint256 part = c * s[i] / BPS;
                 accrued[token][r[i]] += part;
                 left -= part;
             }
             accrued[token][r[n - 1]] += left;
         }
-        poolManager.mint(address(this), CurrencyLibrary.ADDRESS_ZERO.toId(), fee);
+        poolManager.mint(address(this), p.pair.toId(), fee);
     }
 
-    // ---------------------------------------------------------------- fee claims
+    // ---------------------------------------------------------------- claims, burns
 
     function claim(address token) public returns (uint256 amount) {
         amount = accrued[token][msg.sender];
         if (amount == 0) return 0;
         accrued[token][msg.sender] = 0;
-        poolManager.unlock(abi.encode(msg.sender, amount));
+        _pay(pools[poolIdOf[token]].pair, msg.sender, amount);
         emit FeesClaimed(token, msg.sender, amount);
     }
 
@@ -364,12 +410,26 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
         amount = holdersPending[token];
         if (amount == 0) return 0;
         holdersPending[token] = 0;
-        poolManager.unlock(abi.encode(address(this), amount));
-        LaunchToken(token).distribute{value: amount}();
+        Currency pair = pools[poolIdOf[token]].pair;
+        if (pair.isAddressZero()) {
+            _pay(pair, address(this), amount);
+            LaunchToken(token).distribute{value: amount}(amount);
+        } else {
+            _pay(pair, token, amount);
+            LaunchToken(token).distribute(amount);
+        }
         emit HoldersFlushed(token, amount);
     }
 
-    /// @notice A fee recipient can hand its slot (future fees) to another wallet.
+    /// @notice Spends the token's pending burn fees buying it in its own pool and sends the tokens to the dead address.
+    function burn(address token) external returns (uint256 burned) {
+        uint256 amount = burnPending[token];
+        if (amount == 0) return 0;
+        burnPending[token] = 0;
+        burned = abi.decode(poolManager.unlock(abi.encode(BURN, token, amount, address(0))), (uint256));
+    }
+
+    /// @notice A creator-fee recipient can hand its slot (future fees) to another wallet.
     function changeRecipient(address token, address to) external {
         if (to == address(0)) revert ZeroAddress();
         address[] storage r = _recipients[token];
@@ -384,19 +444,39 @@ contract LaunchHook is IHooks, IUnlockCallback, Owned {
         emit RecipientChanged(token, msg.sender, to);
     }
 
-    function withdrawPlatformFees(address to) external onlyOwner returns (uint256 amount) {
-        amount = platformAccrued;
+    function withdrawPlatformFees(address pair, address to) external onlyOwner returns (uint256 amount) {
+        amount = platformAccrued[pair];
         if (amount == 0) return 0;
-        platformAccrued = 0;
-        poolManager.unlock(abi.encode(to, amount));
-        emit PlatformFeesWithdrawn(to, amount);
+        platformAccrued[pair] = 0;
+        _pay(Currency.wrap(pair), to, amount);
+        emit PlatformFeesWithdrawn(pair, to, amount);
+    }
+
+    function _pay(Currency c, address to, uint256 amount) internal {
+        poolManager.unlock(abi.encode(PAY, Currency.unwrap(c), amount, to));
     }
 
     function unlockCallback(bytes calldata data) external onlyPoolManager returns (bytes memory) {
-        (address to, uint256 amount) = abi.decode(data, (address, uint256));
-        poolManager.burn(address(this), CurrencyLibrary.ADDRESS_ZERO.toId(), amount);
-        poolManager.take(CurrencyLibrary.ADDRESS_ZERO, to, amount);
-        return "";
+        (uint8 kind, address a, uint256 amount, address to) = abi.decode(data, (uint8, address, uint256, address));
+        if (kind == PAY) {
+            Currency c = Currency.wrap(a);
+            poolManager.burn(address(this), c.toId(), amount);
+            poolManager.take(c, to, amount);
+            return "";
+        }
+        PoolKey memory key = _keys[a];
+        BalanceDelta d = poolManager.swap(
+            key,
+            SwapParams({zeroForOne: true, amountSpecified: -int256(amount), sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1}),
+            ""
+        );
+        uint256 paid = uint256(uint128(-d.amount0()));
+        uint256 out = uint256(uint128(d.amount1()));
+        poolManager.burn(address(this), key.currency0.toId(), paid);
+        poolManager.take(key.currency1, DEAD, out);
+        if (paid < amount) burnPending[a] += amount - paid;
+        emit Burned(a, paid, out);
+        return abi.encode(out);
     }
 
     // ---------------------------------------------------------------- unused hooks

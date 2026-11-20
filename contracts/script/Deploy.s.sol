@@ -12,6 +12,8 @@ import {LaunchRouter} from "../src/LaunchRouter.sol";
 /// forge script script/Deploy.s.sol --rpc-url base --broadcast --private-key $DEPLOYER_KEY
 contract Deploy is Script {
     address constant CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+    address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    address constant CBBTC = 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf;
     IPoolManager constant BASE_PM = IPoolManager(0x498581fF718922c3f8e6A244956aF099B2652b2b);
 
     function run() external {
@@ -28,10 +30,16 @@ contract Deploy is Script {
             HookMiner.find(CREATE2_DEPLOYER, flags, type(LaunchHook).creationCode, abi.encode(PM, msg.sender));
         LaunchHook hook = new LaunchHook{salt: salt}(PM, msg.sender);
         require(address(hook) == hookAddr, "hook address mismatch");
-        LaunchFactory factory = new LaunchFactory(PM, hook, startTick);
+        LaunchFactory factory = new LaunchFactory(PM, hook, msg.sender);
         LaunchRouter router = new LaunchRouter(PM, factory);
         hook.setFactory(address(factory));
         hook.setTrustedRouter(address(router), true);
+        factory.setPair(address(0), true, startTick);
+        if (block.chainid == 8453) {
+            factory.setPair(USDC, true, int24(vm.envOr("USDC_TICK", int256(402_000))));
+            factory.setPair(CBBTC, true, int24(vm.envOr("CBBTC_TICK", int256(466_200))));
+        }
+        if (owner != msg.sender) factory.transferOwnership(owner);
         if (owner != msg.sender) hook.transferOwnership(owner);
         vm.stopBroadcast();
 

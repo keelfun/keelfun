@@ -14,6 +14,50 @@ const SYNC_MS = 3_000;
 const MAX_UPLOAD = 1_000_000;
 
 const eventAbi = [...launchFactoryAbi, ...launchHookAbi];
+// Pair assets the factory allows, with their launch start tick (1B supply) and decimals.
+const PAIRS: Record<string, { symbol: string; decimals: number; tick: number }> = {
+  [ZERO]: { symbol: "ETH", decimals: 18, tick: 200_200 },
+  "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": { symbol: "USDC", decimals: 6, tick: 402_000 },
+  "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf": { symbol: "cbBTC", decimals: 8, tick: 466_200 },
+  "0xb2000000000000000000002d0ba3164cc74f58b7": { symbol: "GOOGLC", decimals: 8, tick: 412000 },
+  "0xb20000000000000000000078ee7ce2fe4908108c": { symbol: "NVDAC", decimals: 8, tick: 405600 },
+  "0xb2000000000000000000008bc8786b856e61707c": { symbol: "METAC", decimals: 8, tick: 419800 },
+  "0xbbcb0356bb9e6b3faa5cbf9e5f36185d53403ac9": { symbol: "BCOIN", decimals: 18, tick: 173000 },
+  "0xb2000000000000000000007b9fcbd005511acbd5": { symbol: "SPCXC", decimals: 8, tick: 405000 },
+  "0xb200000000000000000000397293cb8cda9a10c5": { symbol: "SNDKC", decimals: 8, tick: 422000 },
+  "0xb2000000000000000000001e800a7f5189430cd0": { symbol: "TSLAC", decimals: 8, tick: 415000 },
+  "0xb200000000000000000000d9192b6b456483c2e8": { symbol: "AMZNC", decimals: 8, tick: 411400 },
+  "0xb200000000000000000000c2e324d24d7eecd1fb": { symbol: "AAPLC", decimals: 8, tick: 414600 },
+  "0xb2000000000000000000004884b426556b92883d": { symbol: "MSTRC", decimals: 8, tick: 400600 },
+  "0x92ecf64fdb76e60b76d78a29ad4bf9d38b7b1b97": { symbol: "NVDA", decimals: 18, tick: 175400 },
+  "0xc445d35f74f8cd24a596d4db8228840d0a938f6d": { symbol: "SATA", decimals: 18, tick: 170400 },
+  "0xb200000000000000000000ab99cfa739e253872b": { symbol: "MSFTC", decimals: 8, tick: 418000 },
+  "0xca47fa9f4c55a8c2c83bfb872fd18d3c656795cf": { symbol: "STRC", decimals: 18, tick: 171200 },
+  "0xb200000000000000000000fd2f87532b90095211": { symbol: "MUC", decimals: 8, tick: 421200 },
+  "0x5de98c65a9a3c414550e6663666bc725c23c2e7b": { symbol: "MSTR", decimals: 18, tick: 170200 },
+  "0x74ed07d83999bc5db0ffd850da0a6bd782abd39c": { symbol: "TSLA", decimals: 18, tick: 184800 },
+  "0xb2000000000000000000000d8ce462e99ee7a47b": { symbol: "AMDC", decimals: 8, tick: 417600 },
+  "0xcc7cef3de42be48110e1fb753e4a314cf6a574f2": { symbol: "ASST", decimals: 18, tick: 154000 },
+  "0x2f11eeee0bf21e7661a22dbbbb9068f4ad191b86": { symbol: "BNIU", decimals: 18, tick: 137200 },
+  "0xb20000000000000000000058b8c947e44011dfe6": { symbol: "NFLXC", decimals: 8, tick: 396600 },
+  "0xb2000000000000000000007d16372840df4dabbe": { symbol: "PLTRC", decimals: 8, tick: 406200 },
+  "0xb200000000000000000000fc737aea6196ab5a4c": { symbol: "AVGOC", decimals: 8, tick: 414200 },
+  "0x1a4dfa04a5c8f85ecad6ffd3c211051f8a43e280": { symbol: "GOOGL", decimals: 18, tick: 181800 },
+  "0xb200000000000000000000f720c26062bc3067da": { symbol: "TTWOC", decimals: 8, tick: 409400 },
+  "0xb200000000000000000000347afba223d7b6b63c": { symbol: "ORCLC", decimals: 8, tick: 402800 },
+  "0x41f7a63713e76c0ab800be03bae9f17b8a356348": { symbol: "AAPL", decimals: 18, tick: 184200 },
+  "0xb200000000000000000000187f7071d6e321a7d2": { symbol: "SKHYC", decimals: 8, tick: 403800 },
+  "0xb20000000000000000000016f9dfe862feba122b": { symbol: "BEC", decimals: 8, tick: 406800 },
+  "0x5cda0e1ca4ce2af96315f7f8963c85399c172204": { symbol: "WTCOIN", decimals: 18, tick: 172400 },
+  "0x0f6c508ef7257c4b99bd1bc8aef750da64840813": { symbol: "AVGO", decimals: 18, tick: 184000 },
+  "0x6aed8b1acfb04f4e0e6db580f12ff41438a394e5": { symbol: "WTFGI", decimals: 18, tick: 143400 },
+  "0xb200000000000000000000f1a0f91e34892e4718": { symbol: "LLYC", decimals: 8, tick: 428000 },
+  "0xaaf450456949eb5fc77987f619653e77383a8170": { symbol: "AMD", decimals: 18, tick: 187200 },
+  "0xb20000000000000000000024170488e788cbbcb4": { symbol: "BRK.BC", decimals: 8, tick: 419800 },
+  "0xb20000000000000000000019f6e7c675b73c2e4d": { symbol: "CRCLC", decimals: 8, tick: 395400 },
+  "0xb2000000000000000000008fde21a1f5c69fec0b": { symbol: "WDCC", decimals: 8, tick: 412600 },
+};
+const pairOf = (a: unknown) => PAIRS[lc(String(a ?? ZERO))] ?? PAIRS[ZERO];
 const wei = (v: bigint) => Number(v) / 1e18;
 const lc = (s: string) => s.toLowerCase();
 const json = (data: unknown, status = 200) =>
@@ -59,7 +103,9 @@ export class Indexer extends DurableObject<Env> {
         launch_block INTEGER, launch_ts INTEGER, launch_tx TEXT,
         burned REAL DEFAULT 0, net_sold REAL DEFAULT 0,
         price REAL, pool_eth REAL DEFAULT 0, volume REAL DEFAULT 0, trade_count INTEGER DEFAULT 0,
-        last_trade_ts INTEGER DEFAULT 0
+        last_trade_ts INTEGER DEFAULT 0, pair TEXT DEFAULT '0x0000000000000000000000000000000000000000',
+        buy_bps INTEGER DEFAULT 100, sell_bps INTEGER DEFAULT 100, creator_bps INTEGER DEFAULT 10000,
+        holders_bps INTEGER DEFAULT 0, burn_bps INTEGER DEFAULT 0, editable INTEGER DEFAULT 0, buyback_burned REAL DEFAULT 0
       );
       CREATE TABLE IF NOT EXISTS trades (
         id TEXT PRIMARY KEY, token TEXT, trader TEXT, is_buy INTEGER, eth REAL, tokens REAL, fee REAL,
@@ -84,8 +130,22 @@ export class Indexer extends DurableObject<Env> {
     } catch {}
   }
 
-  private startPriceFor(supply: number) {
-    return Math.pow(1.0001, -(this.startTick + TICKS_PER_10X * Math.round(Math.log10(supply / BASE_SUPPLY))));
+  /** Opening price in pair units per token. */
+  private startPriceFor(supply: number, pair: unknown = ZERO) {
+    const p = pairOf(pair);
+    const tick = p.tick + TICKS_PER_10X * Math.round(Math.log10(supply / BASE_SUPPLY));
+    return Math.pow(1.0001, -tick) * 10 ** (18 - p.decimals);
+  }
+
+  /** ETH value of one unit of the pair asset (0 while a price is unknown). */
+  private pairEth(pair: unknown) {
+    const sym = pairOf(pair).symbol;
+    if (sym === "ETH") return 1;
+    const eth = this.ethUsd();
+    if (!eth) return 0;
+    if (sym === "USDC") return 1 / eth;
+    if (sym === "cbBTC") return Number(this.meta("btc_usd") ?? 0) / eth;
+    return Number(this.meta(`px_${lc(String(pair))}`) ?? 0) / eth;
   }
 
   private meta(key: string): string | null {
@@ -167,23 +227,43 @@ export class Indexer extends DurableObject<Env> {
     }
   }
 
+  /** ETH and BTC from Coinbase, stock-pair prices from DexScreener (CoinGecko rate-limits Cloudflare egress). */
   private async refreshEthUsd() {
     const at = Number(this.meta("eth_usd_at") ?? 0);
     if (Date.now() - at < 60_000) return;
+    const get = async (url: string) => {
+      const r = await fetch(url, { headers: { accept: "application/json", "user-agent": "keel-indexer" }, signal: AbortSignal.timeout(5000) });
+      if (!r.ok) throw new Error(`${url} ${r.status}`);
+      return r.json();
+    };
     try {
-      const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd", {
-        headers: { accept: "application/json", "user-agent": "keel-indexer" },
-        signal: AbortSignal.timeout(4000),
-      });
-      const j = (await r.json()) as { ethereum?: { usd?: number } };
-      if (j.ethereum?.usd) {
-        this.setMeta("eth_usd", String(j.ethereum.usd));
-        this.setMeta("eth_usd_at", String(Date.now()));
-      } else {
-        console.error("eth price: unexpected response", r.status);
+      for (const [sym, key] of [["ETH", "eth_usd"], ["BTC", "btc_usd"]] as const) {
+        const j = (await get(`https://api.coinbase.com/v2/prices/${sym}-USD/spot`)) as { data?: { amount?: string } };
+        const v = Number(j.data?.amount);
+        if (v > 0) this.setMeta(key, String(v));
       }
+      this.setMeta("eth_usd_at", String(Date.now()));
     } catch (e) {
       console.error("eth price", e);
+    }
+    const stocks = Object.keys(PAIRS).filter((a) => !["ETH", "USDC", "cbBTC"].includes(PAIRS[a].symbol));
+    for (let i = 0; i < stocks.length; i += 30) {
+      try {
+        const chunk = stocks.slice(i, i + 30);
+        const j = (await get(`https://api.dexscreener.com/latest/dex/tokens/${chunk.join(",")}`)) as {
+          pairs?: { chainId: string; baseToken: { address: string }; priceUsd?: string; liquidity?: { usd?: number } }[];
+        };
+        const best = new Map<string, { px: number; liq: number }>();
+        for (const pr of j.pairs ?? []) {
+          const a = lc(pr.baseToken.address);
+          const liq = pr.liquidity?.usd ?? 0;
+          if (pr.chainId !== "base" || !chunk.includes(a) || !(Number(pr.priceUsd) > 0)) continue;
+          if (!best.has(a) || best.get(a)!.liq < liq) best.set(a, { px: Number(pr.priceUsd), liq });
+        }
+        for (const [a, v] of best) this.setMeta(`px_${a}`, String(v.px));
+      } catch (e) {
+        console.error("stock prices", e);
+      }
     }
   }
 
@@ -208,7 +288,7 @@ export class Indexer extends DurableObject<Env> {
 
     const metas = new Map<string, Row>();
     for (const l of core) {
-      if (l.eventName !== "TokenLaunched") continue;
+      if (l.eventName !== "TokenLaunched" && l.eventName !== "MetadataUpdated") continue;
       const uri = String((l.args as { metadataURI?: string }).metadataURI ?? "");
       const m = await this.resolveMetadata(uri);
       if (m) metas.set(uri, m);
@@ -224,19 +304,23 @@ export class Indexer extends DurableObject<Env> {
       for (const l of launches) {
         const a = l.args as {
           token: string; creator: string; poolId: string; name: string; symbol: string; metadataURI: string;
-          supply: bigint; feeBps: number; holders: boolean; antiSnipe: boolean; tokensBurned: bigint;
+          supply: bigint; pair: string; buyBps: number; sellBps: number; creatorBps: number; holdersBps: number;
+          burnBps: number; antiSnipe: boolean; editable: boolean;
         };
         const m = metas.get(a.metadataURI) ?? {};
         const supply = wei(a.supply);
         this.sql.exec(
           `INSERT OR IGNORE INTO tokens (address, creator, pool_id, name, symbol, metadata_uri, description, image, website, x, telegram,
-            discord, supply, fee_bps, holders_route, anti_snipe, launch_block, launch_ts, launch_tx, burned, price)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            discord, supply, fee_bps, holders_route, anti_snipe, launch_block, launch_ts, launch_tx, burned, price,
+            pair, buy_bps, sell_bps, creator_bps, holders_bps, burn_bps, editable)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           lc(a.token), lc(a.creator), a.poolId, a.name, a.symbol, a.metadataURI,
           str(m.description), str(m.image), str(m.website), str(m.x), str(m.telegram), str(m.discord),
-          supply, Number(a.feeBps), a.holders ? 1 : 0, a.antiSnipe ? 1 : 0,
+          supply, Number(a.buyBps), Number(a.holdersBps) > 0 && Number(a.creatorBps) === 0 ? 1 : 0, a.antiSnipe ? 1 : 0,
           Number(l.blockNumber), ts.get(Number(l.blockNumber)) ?? 0, l.transactionHash,
-          wei(a.tokensBurned ?? 0n), this.startPriceFor(supply),
+          0, this.startPriceFor(supply, a.pair),
+          lc(a.pair), Number(a.buyBps), Number(a.sellBps), Number(a.creatorBps), Number(a.holdersBps), Number(a.burnBps),
+          a.editable ? 1 : 0,
         );
       }
       for (const l of rest) {
@@ -250,15 +334,17 @@ export class Indexer extends DurableObject<Env> {
           this.addBalance(token, lc(a.to), v);
         } else if (l.eventName === "Trade") {
           const a = l.args as {
-            token: string; trader: string; isBuy: boolean; ethAmount: bigint; tokenAmount: bigint;
+            token: string; trader: string; isBuy: boolean; pairAmount: bigint; tokenAmount: bigint;
             platformFee: bigint; creatorFee: bigint; sqrtPriceX96: bigint;
           };
-          const fee = wei(a.platformFee + a.creatorFee);
-          const eth = wei(a.ethAmount);
-          const sq = Number(a.sqrtPriceX96) / 2 ** 96;
-          const price = 1 / (sq * sq);
-          const poolDelta = a.isBuy ? eth - fee : -(eth + fee);
           const token = lc(a.token);
+          const pd = pairOf(this.sql.exec("SELECT pair FROM tokens WHERE address = ?", token).toArray()[0]?.pair).decimals;
+          const unit = (v: bigint) => Number(v) / 10 ** pd;
+          const fee = unit(a.platformFee + a.creatorFee);
+          const eth = unit(a.pairAmount);
+          const sq = Number(a.sqrtPriceX96) / 2 ** 96;
+          const price = (1 / (sq * sq)) * 10 ** (18 - pd);
+          const poolDelta = a.isBuy ? eth - fee : -(eth + fee);
           const tokens = wei(a.tokenAmount);
           const prevSold = Number(this.sql.exec("SELECT net_sold FROM tokens WHERE address = ?", token).toArray()[0]?.net_sold ?? 0);
           const netSold = Math.max(0, prevSold + (a.isBuy ? tokens : -tokens));
@@ -272,8 +358,23 @@ export class Indexer extends DurableObject<Env> {
             `UPDATE tokens SET price = ?, net_sold = ?, pool_eth = MAX(0, pool_eth + ?), volume = volume + ?,
              trade_count = trade_count + 1, last_trade_ts = ?, route_fees = route_fees + ?, platform_fees = platform_fees + ?
              WHERE address = ?`,
-            price, netSold, poolDelta, eth, time, wei(a.creatorFee), wei(a.platformFee), token,
+            price, netSold, poolDelta, eth, time, unit(a.creatorFee), unit(a.platformFee), token,
           );
+        } else if (l.eventName === "Burned") {
+          const a = l.args as { token: string; tokensBurned: bigint };
+          const n = wei(a.tokensBurned);
+          this.sql.exec("UPDATE tokens SET burned = burned + ?, buyback_burned = buyback_burned + ? WHERE address = ?", n, n, lc(a.token));
+        } else if (l.eventName === "MetadataUpdated") {
+          const a = l.args as { token: string; metadataURI: string };
+          const m = metas.get(a.metadataURI);
+          if (m) {
+            this.sql.exec(
+              "UPDATE tokens SET metadata_uri = ?, description = ?, image = ?, website = ?, x = ?, telegram = ?, discord = ? WHERE address = ?",
+              a.metadataURI, str(m.description), str(m.image), str(m.website), str(m.x), str(m.telegram), str(m.discord), lc(a.token),
+            );
+          }
+        } else if (l.eventName === "MetadataFrozen") {
+          this.sql.exec("UPDATE tokens SET editable = 0 WHERE address = ?", lc((l.args as { token: string }).token));
         } else if (l.eventName === "RouteSet") {
           const a = l.args as { token: string; recipients: string[]; shares: number[] };
           const route = a.recipients.map((r, i) => ({ address: lc(r), bps: Number(a.shares[i]) }));
@@ -361,9 +462,16 @@ export class Indexer extends DurableObject<Env> {
   }
 
   private stats() {
-    const c = this.sql.exec(
-      "SELECT COUNT(*) AS tokens, COALESCE(SUM(volume), 0) AS volume, COALESCE(SUM(trade_count), 0) AS trades, COALESCE(SUM(platform_fees), 0) AS pfees FROM tokens",
-    ).one();
+    const c = { tokens: 0, volume: 0, trades: 0, pfees: 0 };
+    for (const r of this.sql
+      .exec("SELECT pair, COUNT(*) AS n, SUM(volume) AS v, SUM(trade_count) AS t, SUM(platform_fees) AS f FROM tokens GROUP BY pair")
+      .toArray()) {
+      const k = this.pairEth(r.pair);
+      c.tokens += Number(r.n);
+      c.trades += Number(r.t);
+      c.volume += Number(r.v) * k;
+      c.pfees += Number(r.f) * k;
+    }
     return {
       chainId: Number(this.env.CHAIN_ID),
       factory: this.env.FACTORY,
@@ -371,6 +479,7 @@ export class Indexer extends DurableObject<Env> {
       cursor: Number(this.meta("cursor") ?? 0),
       head: Number(this.meta("head") ?? 0),
       ethUsd: this.ethUsd(),
+      btcUsd: Number(this.meta("btc_usd") ?? 0),
       tokens: Number(c.tokens),
       platformFeesEth: Number(c.pfees),
       volumeEth: Number(c.volume),
@@ -422,14 +531,17 @@ export class Indexer extends DurableObject<Env> {
 
   private formatToken(r: Row) {
     const usd = this.ethUsd();
+    const k = this.pairEth(r.pair);
+    const pair = pairOf(r.pair);
     const supply = Number(r.supply);
-    const start = this.startPriceFor(supply);
-    const price = Number(r.price ?? start);
+    const start = this.startPriceFor(supply, r.pair) * k;
+    const pairPrice = Number(r.price ?? this.startPriceFor(supply, r.pair));
+    const price = pairPrice * k;
     const launchTs = Number(r.launch_ts);
-    const ref = r.price_24h != null ? Number(r.price_24h) : launchTs > Date.now() / 1000 - 86_400 ? start : price;
+    const ref = r.price_24h != null ? Number(r.price_24h) * k : launchTs > Date.now() / 1000 - 86_400 ? start : price;
     const netSold = Number(r.net_sold);
     const poolTokens = Math.max(0, supply - Number(r.burned) - netSold);
-    const liquidityEth = Number(r.pool_eth) + poolTokens * price;
+    const liquidityEth = Number(r.pool_eth) * k + poolTokens * price;
     const fdvEth = price * supply;
     return {
       address: r.address,
@@ -446,11 +558,23 @@ export class Indexer extends DurableObject<Env> {
       discord: r.discord,
       supply,
       feeBps: Number(r.fee_bps),
+      pair: String(r.pair ?? ZERO),
+      pairSymbol: pair.symbol,
+      pairDecimals: pair.decimals,
+      pairEth: k,
+      priceInPair: pairPrice,
+      buyBps: Number(r.buy_bps),
+      sellBps: Number(r.sell_bps),
+      creatorBps: Number(r.creator_bps),
+      holdersBps: Number(r.holders_bps),
+      burnBps: Number(r.burn_bps),
+      editable: Boolean(r.editable),
+      buybackBurned: Number(r.buyback_burned ?? 0),
       holdersRoute: Boolean(r.holders_route),
       antiSnipe: Boolean(r.anti_snipe),
       recipients: safeParseArr(String(r.recipients ?? "[]")),
-      routeFeesEth: Number(r.route_fees),
-      platformFeesEth: Number(r.platform_fees),
+      routeFeesEth: Number(r.route_fees) * k,
+      platformFeesEth: Number(r.platform_fees) * k,
       createdAt: launchTs,
       launchBlock: Number(r.launch_block),
       launchTx: r.launch_tx,
@@ -462,12 +586,12 @@ export class Indexer extends DurableObject<Env> {
       fdvEth,
       fdvUsd: fdvEth * usd,
       change24h: ref > 0 ? (price - ref) / ref : 0,
-      volume24hEth: Number(r.vol_24h ?? 0),
-      volume24hUsd: Number(r.vol_24h ?? 0) * usd,
-      volumeEth: Number(r.volume),
+      volume24hEth: Number(r.vol_24h ?? 0) * k,
+      volume24hUsd: Number(r.vol_24h ?? 0) * k * usd,
+      volumeEth: Number(r.volume) * k,
       liquidityEth,
       liquidityUsd: liquidityEth * usd,
-      poolEth: Number(r.pool_eth),
+      poolEth: Number(r.pool_eth) * k,
       holders: Number(r.holders ?? 0),
       trades: Number(r.trade_count),
       lastTradeAt: Number(r.last_trade_ts),
@@ -479,13 +603,14 @@ export class Indexer extends DurableObject<Env> {
     const row = this.sql.exec(base.sql, ...base.binds, addr).toArray()[0];
     if (!row) return json({ error: "token not found" }, 404);
     if (!sub) return json({ token: this.formatToken(row), ethUsd: this.ethUsd() });
+    const k = this.pairEth(row.pair);
     if (sub === "trades") {
       const limit = Math.min(200, Number(q.get("limit") ?? 50));
       const rows = this.sql.exec(`SELECT * FROM trades WHERE token = ? ORDER BY block DESC, id DESC LIMIT ${limit}`, addr).toArray();
       return json({
         trades: rows.map((t) => ({
-          id: t.id, trader: t.trader, isBuy: Boolean(t.is_buy), eth: t.eth, tokens: t.tokens, fee: t.fee,
-          priceEth: t.price, ts: t.ts, tx: t.tx, block: t.block,
+          id: t.id, trader: t.trader, isBuy: Boolean(t.is_buy), eth: Number(t.eth) * k, tokens: t.tokens, fee: Number(t.fee) * k,
+          priceEth: Number(t.price) * k, pairAmount: t.eth, ts: t.ts, tx: t.tx, block: t.block,
         })),
       });
     }
@@ -503,11 +628,11 @@ export class Indexer extends DurableObject<Env> {
         }));
       return json({ holders: rows });
     }
-    if (sub === "candles") return json({ candles: this.candles(addr, Number(row.launch_ts), q, this.startPriceFor(Number(row.supply))) });
+    if (sub === "candles") return json({ candles: this.candles(addr, Number(row.launch_ts), q, this.startPriceFor(Number(row.supply), row.pair), k) });
     return json({ error: "not found" }, 404);
   }
 
-  private candles(addr: string, launchTs: number, q: URLSearchParams, startPrice: number) {
+  private candles(addr: string, launchTs: number, q: URLSearchParams, startPrice: number, k: number) {
     const res = [15, 60, 300, 900, 3600, 14400, 86400].includes(Number(q.get("res"))) ? Number(q.get("res")) : 60;
     const rows = this.sql.exec("SELECT ts, price, eth FROM trades WHERE token = ? ORDER BY ts, block, id", addr).toArray();
     type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
@@ -531,7 +656,7 @@ export class Indexer extends DurableObject<Env> {
       c.volume += Number(r.eth);
       prev = p;
     }
-    return out;
+    return out.map((c) => ({ ...c, open: c.open * k, high: c.high * k, low: c.low * k, close: c.close * k, volume: c.volume * k }));
   }
 
   private portfolio(wallet: string) {
@@ -553,14 +678,14 @@ export class Indexer extends DurableObject<Env> {
       .sort((a, b) => b.valueEth - a.valueEth);
     const trades = this.sql
       .exec(
-        `SELECT tr.*, t.symbol, t.name, t.image FROM trades tr JOIN tokens t ON t.address = tr.token
+        `SELECT tr.*, t.symbol, t.name, t.image, t.pair FROM trades tr JOIN tokens t ON t.address = tr.token
          WHERE tr.trader = ? ORDER BY tr.block DESC LIMIT 50`,
         wallet,
       )
       .toArray()
       .map((t) => ({
         id: t.id, token: t.token, symbol: t.symbol, name: t.name, image: t.image, isBuy: Boolean(t.is_buy),
-        eth: t.eth, tokens: t.tokens, priceEth: t.price, ts: t.ts, tx: t.tx,
+        eth: Number(t.eth) * this.pairEth(t.pair), tokens: t.tokens, priceEth: Number(t.price) * this.pairEth(t.pair), ts: t.ts, tx: t.tx,
       }));
     return { holdings, created, trades, ethUsd: this.ethUsd() };
   }

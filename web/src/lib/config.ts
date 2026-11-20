@@ -1,4 +1,5 @@
 import { defineChain, type Address } from "viem";
+import { STOCK_PAIRS } from "./stockPairs";
 
 const eth = { name: "Ether", symbol: "ETH", decimals: 18 } as const;
 
@@ -40,22 +41,46 @@ export const SOCIALS = {
 
 const zero = "0x0000000000000000000000000000000000000000";
 export const ADDR = {
-  factory: (process.env.NEXT_PUBLIC_FACTORY || (chainId === 8453 ? "0x736dE2DbC4468F8224c63a11355980fB33949387" : zero)) as Address,
-  hook: (process.env.NEXT_PUBLIC_HOOK || (chainId === 8453 ? "0x7fA1311D29603211365b34a35eEF99208f06A8CC" : zero)) as Address,
-  router: (process.env.NEXT_PUBLIC_ROUTER || (chainId === 8453 ? "0x7c3Afc67Ce06C2bBFEfB580243F6aD01948C0473" : zero)) as Address,
+  factory: (process.env.NEXT_PUBLIC_FACTORY || (chainId === 8453 ? "0xDC802747d6c5271e2fC8a51bc52D279bDb80b463" : zero)) as Address,
+  hook: (process.env.NEXT_PUBLIC_HOOK || (chainId === 8453 ? "0xD7aDF63eDeb2e784bb949d9f848f9aE2D104A8Cc" : zero)) as Address,
+  router: (process.env.NEXT_PUBLIC_ROUTER || (chainId === 8453 ? "0x9AfFc874A3DCd94DF5Bd6eB23d4f48687f47B648" : zero)) as Address,
   poolManager: (process.env.NEXT_PUBLIC_POOL_MANAGER || "0x498581ff718922c3f8e6a244956af099b2652b2b") as Address,
 };
 export const DEPLOYED = ADDR.factory !== zero;
 
 export const BASE_SUPPLY = 1_000_000_000;
 export const SUPPLY_TIERS = [1e9, 1e10, 1e11, 1e12];
-export const FEE_TIERS = [
-  { bps: 100, platformBps: 40 },
-  { bps: 200, platformBps: 50 },
-  { bps: 300, platformBps: 60 },
-  { bps: 500, platformBps: 75 },
-  { bps: 1000, platformBps: 100 },
+/** Protocol slice (bps of the trade) of a 1%-10% tax: 0.4% at 1%, +0.1% per extra 1%, capped at 1%. */
+export function platformBpsFor(taxBps: number) {
+  return Math.min(100, 40 + Math.floor((taxBps - 100) / 10));
+}
+export const FEE_TIERS = [100, 200, 300, 500, 1000].map((bps) => ({ bps, platformBps: platformBpsFor(bps) }));
+
+export type PairInfo = {
+  address: Address;
+  symbol: string;
+  name: string;
+  decimals: number;
+  tick: number;
+  logo: string;
+  presets: readonly string[];
+  stock?: boolean;
+  usd?: number;
+};
+/** Pair assets the factory allows. `tick` is the launch start tick for a 1B supply. */
+export const PAIRS: PairInfo[] = [
+  { address: zero as Address, symbol: "ETH", name: "Ether", decimals: 18, tick: 200_200, logo: "https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg", presets: ["0.01", "0.05", "0.1", "0.5"] },
+  { address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", symbol: "USDC", name: "USD Coin", decimals: 6, tick: 402_000, logo: "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png", presets: ["10", "50", "100", "500"] },
+  { address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", symbol: "cbBTC", name: "Coinbase Wrapped BTC", decimals: 8, tick: 466_200, logo: "https://coin-images.coingecko.com/coins/images/40143/large/cbbtc.webp", presets: ["0.0001", "0.0005", "0.001", "0.005"] },
+  ...STOCK_PAIRS,
 ];
+export function pairInfo(address?: string | null): PairInfo {
+  return PAIRS.find((p) => p.address.toLowerCase() === (address ?? zero).toLowerCase()) ?? PAIRS[0];
+}
+/** Opening market cap in pair units (same for every supply tier). */
+export function launchCap(p: PairInfo) {
+  return 1e9 * Math.pow(1.0001, -p.tick) * 10 ** (18 - p.decimals);
+}
 export const SNIPE = { startBps: 9000, seconds: 60 };
 export function snipeBpsAt(launchedAt: number, now: number) {
   const dt = now - launchedAt;

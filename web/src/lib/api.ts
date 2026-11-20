@@ -18,6 +18,18 @@ export type Token = {
   supply: number;
   feeBps: number;
   holdersRoute: boolean;
+  pair: string;
+  pairSymbol: string;
+  pairDecimals: number;
+  pairEth: number;
+  priceInPair: number;
+  buyBps: number;
+  sellBps: number;
+  creatorBps: number;
+  holdersBps: number;
+  burnBps: number;
+  editable: boolean;
+  buybackBurned: number;
   antiSnipe: boolean;
   recipients: { address: `0x${string}`; bps: number }[];
   routeFeesEth: number;
@@ -59,7 +71,7 @@ export type Trade = {
 
 export type Holder = { holder: string; amount: number; pct: number; label: "pool" | "burn" | "creator" | null };
 export type Candle = { time: number; open: number; high: number; low: number; close: number; volume: number };
-export type Stats = { chainId: number; ethUsd: number; tokens: number; volumeEth: number; trades: number; head: number; cursor: number; platformFeesEth?: number };
+export type Stats = { chainId: number; ethUsd: number; tokens: number; volumeEth: number; trades: number; head: number; cursor: number; platformFeesEth?: number; btcUsd?: number };
 export type Portfolio = {
   holdings: { token: Token; amount: number; valueEth: number; valueUsd: number }[];
   created: Token[];

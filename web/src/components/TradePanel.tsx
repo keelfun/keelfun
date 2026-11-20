@@ -1,16 +1,14 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { formatEther, maxUint256, parseEther } from "viem";
+import { erc20Abi, formatEther, formatUnits, maxUint256, parseUnits } from "viem";
 import { useAccount, useBalance, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { launchRouterAbi, launchTokenAbi } from "@/lib/abis";
 import type { Token } from "@/lib/api";
-import { ADDR, chain, DEPLOYED, snipeBpsAt } from "@/lib/config";
+import { ADDR, chain, DEPLOYED, pairInfo, snipeBpsAt } from "@/lib/config";
 import { fmtCompact, fmtEth } from "@/lib/format";
 import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
 import { TokenAvatar } from "./TokenAvatar";
-
-const ETH_LOGO = "https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg";
 
 function useDebounced<T>(v: T, ms = 350) {
   const [d, setD] = useState(v);
@@ -21,9 +19,9 @@ function useDebounced<T>(v: T, ms = 350) {
   return d;
 }
 
-function safeParse(v: string): bigint {
+function safeParse(v: string, decimals = 18): bigint {
   try {
-    return v && Number(v) > 0 ? parseEther(v as `${number}`) : 0n;
+    return v && Number(v) > 0 ? parseUnits(v, decimals) : 0n;
   } catch {
     return 0n;
   }
@@ -35,6 +33,8 @@ export function TradePanel({ token }: { token: Token }) {
   const ensureWallet = useEnsureWallet();
   const confirm = useConfirm();
   const { writeContractAsync } = useWriteContract();
+  const pair = pairInfo(token.pair);
+  const native = pair.symbol === "ETH";
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [slippage, setSlippage] = useState(5);
@@ -56,7 +56,16 @@ export function TradePanel({ token }: { token: Token }) {
     query: { enabled: !!address },
   });
 
-  const amountIn = safeParse(useDebounced(amount));
+  const pairBal = useReadContract({
+    address: pair.address, abi: erc20Abi, functionName: "balanceOf", args: [address!], chainId: chain.id,
+    query: { enabled: !!address && !native, refetchInterval: 6000 },
+  });
+  const pairAllowance = useReadContract({
+    address: pair.address, abi: erc20Abi, functionName: "allowance", args: [address!, ADDR.router], chainId: chain.id,
+    query: { enabled: !!address && !native },
+  });
+
+  const amountIn = safeParse(useDebounced(amount), side === "buy" ? pair.decimals : 18);
   const quote = useQuery({
     queryKey: ["quote", token.address, side, amountIn.toString()],
     enabled: amountIn > 0n && !!client && DEPLOYED,
@@ -74,10 +83,10 @@ export function TradePanel({ token }: { token: Token }) {
   });
 
   const snipeBps = token.antiSnipe ? snipeBpsAt(token.createdAt, now) : 0;
-  const feePct = Math.min(9900, token.feeBps + (side === "buy" ? snipeBps : 0)) / 100;
-  const balance = side === "buy" ? eth.data?.value ?? 0n : (tokBal.data as bigint | undefined) ?? 0n;
+  const feePct = Math.min(9900, (side === "buy" ? token.buyBps + snipeBps : token.sellBps)) / 100;
+  const balance = side === "buy" ? (native ? eth.data?.value : (pairBal.data as bigint | undefined)) ?? 0n : (tokBal.data as bigint | undefined) ?? 0n;
   const insufficient = !!address && amountIn > balance;
-  const presets = side === "buy" ? ["0.01", "0.05", "0.1", "0.5"] : ["25", "50", "75", "100"];
+  const presets = side === "buy" ? [...pair.presets] : ["25", "50", "75", "100"];
 
   function preset(p: string) {
     setMsg(null);
@@ -104,12 +113,21 @@ export function TradePanel({ token }: { token: Token }) {
         await confirm(h);
         await allowance.refetch();
       }
+      if (side === "buy" && !native && ((pairAllowance.data as bigint | undefined) ?? 0n) < amountIn) {
+        setBusy("Approve in wallet…");
+        const h = await writeContractAsync({
+          address: pair.address, abi: erc20Abi, functionName: "approve", args: [ADDR.router, maxUint256], chainId: chain.id,
+        });
+        setBusy("Approving…");
+        await confirm(h);
+        await pairAllowance.refetch();
+      }
       setBusy("Confirm in wallet…");
       const hash =
         side === "buy"
           ? await writeContractAsync({
               address: ADDR.router, abi: launchRouterAbi, functionName: "buy",
-              args: [token.address, minOut, account, deadline], value: amountIn, chainId: chain.id,
+              args: [token.address, amountIn, minOut, account, deadline], value: native ? amountIn : 0n, chainId: chain.id,
             })
           : await writeContractAsync({
               address: ADDR.router, abi: launchRouterAbi, functionName: "sell",
@@ -120,6 +138,7 @@ export function TradePanel({ token }: { token: Token }) {
       setMsg({ ok: true, text: side === "buy" ? `Bought ${token.symbol}` : `Sold ${token.symbol}` });
       setAmount("");
       eth.refetch();
+      pairBal.refetch();
       tokBal.refetch();
     } catch (e) {
       setMsg({ ok: false, text: errMsg(e) });
@@ -129,17 +148,17 @@ export function TradePanel({ token }: { token: Token }) {
   }
 
   const payEth = side === "buy";
-  const outNum = quote.data ? Number(formatEther(quote.data.out)) : 0;
+  const outNum = quote.data ? Number(formatUnits(quote.data.out, side === "buy" ? 18 : pair.decimals)) : 0;
   const outText = quote.data
     ? payEth ? fmtCompact(outNum) : outNum.toLocaleString(undefined, { maximumFractionDigits: 6 })
     : quote.isFetching ? "…" : "0";
   const label = !DEPLOYED
     ? "Swaps open soon"
-    : busy ?? (!address ? "Connect wallet" : amountIn === 0n ? "Enter an amount" : insufficient ? `Not enough ${payEth ? "ETH" : token.symbol}` : "Swap");
+    : busy ?? (!address ? "Connect wallet" : amountIn === 0n ? "Enter an amount" : insufficient ? `Not enough ${payEth ? pair.symbol : token.symbol}` : "Swap");
   const pill = (eth: boolean) => (
     <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-panel-2 py-1 pl-1 pr-3 text-sm font-medium">
-      {eth ? <img src={ETH_LOGO} alt="" className="h-6 w-6 rounded-full" /> : <TokenAvatar src={token.image} symbol={token.symbol} size={24} />}
-      {eth ? "ETH" : token.symbol}
+      {eth ? <img src={pair.logo} alt="" className="h-6 w-6 rounded-full" /> : <TokenAvatar src={token.image} symbol={token.symbol} size={24} />}
+      {eth ? pair.symbol : token.symbol}
     </span>
   );
   return (
@@ -180,7 +199,7 @@ export function TradePanel({ token }: { token: Token }) {
           </div>
           {address && (
             <span className="truncate font-mono">
-              Balance {payEth ? fmtEth(Number(formatEther(balance))) : fmtCompact(Number(formatEther(balance)))}
+              Balance {payEth ? `${Number(formatUnits(balance, pair.decimals)).toLocaleString(undefined, { maximumFractionDigits: 6 })} ${pair.symbol}` : fmtCompact(Number(formatEther(balance)))}
             </span>
           )}
         </div>

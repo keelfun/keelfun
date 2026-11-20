@@ -12,21 +12,32 @@ import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {BalanceDelta, BalanceDeltaLibrary} from "v4-core/src/types/BalanceDelta.sol";
 import {Currency, CurrencyLibrary} from "v4-core/src/types/Currency.sol";
 import {ModifyLiquidityParams, SwapParams} from "v4-core/src/types/PoolOperation.sol";
+import {Owned} from "solmate/src/auth/Owned.sol";
+import {ERC20} from "solmate/src/tokens/ERC20.sol";
+import {SafeTransferLib} from "solmate/src/utils/SafeTransferLib.sol";
 import {LaunchToken} from "./LaunchToken.sol";
 import {LaunchHook} from "./LaunchHook.sol";
 
-/// @notice Deploys a fixed-supply token, opens its native-ETH Uniswap v4 pool and seeds it with the whole supply
-/// as single-sided liquidity. The position is owned by this contract, which has no way to remove it.
-contract LaunchFactory is IUnlockCallback {
+/// @notice Deploys a fixed-supply token, opens its Uniswap v4 pool against an allowed pair asset (ETH, USDC, ...)
+/// and seeds it with the whole supply as single-sided liquidity. The position is owned by this contract, which has
+/// no way to remove it. Token addresses are CREATE2-derived from (creator, salt), so creators can mine vanity
+/// addresses; the token must sort above its pair asset so the pair is always currency0.
+contract LaunchFactory is IUnlockCallback, Owned {
     using PoolIdLibrary for PoolKey;
     using BalanceDeltaLibrary for BalanceDelta;
     using CurrencyLibrary for Currency;
+    using SafeTransferLib for ERC20;
 
     error NotPoolManager();
     error InvalidStartTick();
     error InvalidName();
     error InvalidSupply();
     error InsufficientOutput();
+    error PairNotEnabled();
+    error BadValue();
+    error BadSalt();
+    error NotCreator();
+    error MetadataLocked();
 
     struct LaunchParams {
         string name;
@@ -34,14 +45,30 @@ contract LaunchFactory is IUnlockCallback {
         string metadataURI;
         /// @dev 0 = 1B, 1 = 10B, 2 = 100B, 3 = 1T
         uint8 supplyTier;
-        /// @dev 100, 200, 300, 500 or 1000
-        uint16 feeBps;
+        /// @dev address(0) = native ETH
+        address pair;
+        /// @dev 100-1000 each
+        uint16 buyBps;
+        uint16 sellBps;
+        /// @dev split of the tax left after protocol; must sum to 10000
+        uint16 creatorBps;
+        uint16 holdersBps;
+        uint16 burnBps;
         bool antiSnipe;
-        /// @dev true = fees stream to every holder; false = to `recipients` by `shares` (bps, sum 10000)
-        bool holders;
+        bool editable;
+        /// @dev creator-fee wallets and their shares (bps, sum 10000); empty when creatorBps == 0
         address[] recipients;
         uint16[] shares;
+        bytes32 salt;
+        /// @dev pair asset spent on the creator's tax-free first buy (send as value for ETH, approve otherwise)
+        uint256 devBuy;
         uint256 minTokensOut;
+    }
+
+    struct Pair {
+        bool enabled;
+        /// @dev upper tick of the launch position for a 1B supply (= opening price, token units per pair unit)
+        int24 startTick;
     }
 
     uint256 public constant BASE_SUPPLY = 1_000_000_000 ether;
@@ -53,39 +80,55 @@ contract LaunchFactory is IUnlockCallback {
 
     IPoolManager public immutable poolManager;
     LaunchHook public immutable hook;
-    /// @dev Upper tick of the launch position for a 1B supply (= initial price, in tokens per ETH).
-    int24 public immutable startTick;
 
+    mapping(address pair => Pair) public pairs;
     address[] public allTokens;
     mapping(address token => PoolKey) internal _keys;
+    mapping(address token => address) public creatorOf;
+    mapping(address token => bool) public metadataEditable;
 
+    event PairSet(address indexed pair, bool enabled, int24 startTick);
     event TokenLaunched(
         address indexed token,
         address indexed creator,
         PoolId indexed poolId,
+        address pair,
         string name,
         string symbol,
         string metadataURI,
         uint256 supply,
-        uint16 feeBps,
-        bool holders,
+        uint16 buyBps,
+        uint16 sellBps,
+        uint16 creatorBps,
+        uint16 holdersBps,
+        uint16 burnBps,
         bool antiSnipe,
-        uint256 launchBuyEth,
-        uint256 launchBuyTokens,
-        uint256 tokensBurned
+        bool editable,
+        uint256 devBuy,
+        uint256 devBuyTokens
     );
+    event MetadataUpdated(address indexed token, string metadataURI);
+    event MetadataFrozen(address indexed token);
 
-    constructor(IPoolManager _poolManager, LaunchHook _hook, int24 _startTick) {
+    constructor(IPoolManager _poolManager, LaunchHook _hook, address _owner) Owned(_owner) {
+        poolManager = _poolManager;
+        hook = _hook;
+    }
+
+    // ---------------------------------------------------------------- admin
+
+    function setPair(address pair, bool enabled, int24 startTick) external onlyOwner {
         if (
-            _startTick % TICK_SPACING != 0 || _startTick <= TickMath.minUsableTick(TICK_SPACING)
-                || _startTick + TICKS_PER_10X * int24(uint24(MAX_SUPPLY_TIER)) >= TickMath.maxUsableTick(TICK_SPACING)
+            startTick % TICK_SPACING != 0 || startTick <= TickMath.minUsableTick(TICK_SPACING)
+                || startTick + TICKS_PER_10X * int24(uint24(MAX_SUPPLY_TIER)) >= TickMath.maxUsableTick(TICK_SPACING)
         ) {
             revert InvalidStartTick();
         }
-        poolManager = _poolManager;
-        hook = _hook;
-        startTick = _startTick;
+        pairs[pair] = Pair(enabled, startTick);
+        emit PairSet(pair, enabled, startTick);
     }
+
+    // ---------------------------------------------------------------- views
 
     function tokenCount() external view returns (uint256) {
         return allTokens.length;
@@ -95,9 +138,40 @@ contract LaunchFactory is IUnlockCallback {
         return _keys[token];
     }
 
-    function tickFor(uint8 supplyTier) public view returns (int24) {
-        return startTick + TICKS_PER_10X * int24(uint24(supplyTier));
+    function tickFor(address pair, uint8 supplyTier) public view returns (int24) {
+        return pairs[pair].startTick + TICKS_PER_10X * int24(uint24(supplyTier));
     }
+
+    /// @notice keccak256 of the token's CREATE2 init code, for mining a salt off-chain.
+    function tokenInitCodeHash(string calldata name, string calldata symbol, uint8 supplyTier, address pair, bool holderRewards)
+        public
+        view
+        returns (bytes32)
+    {
+        return keccak256(
+            abi.encodePacked(
+                type(LaunchToken).creationCode,
+                abi.encode(
+                    name, symbol, BASE_SUPPLY * 10 ** supplyTier, address(this), address(hook), pair, holderRewards, _excluded()
+                )
+            )
+        );
+    }
+
+    /// @notice Address `launch` will deploy for `creator` with `salt` and the given init code hash.
+    function predictToken(address creator, bytes32 salt, bytes32 initCodeHash) public view returns (address) {
+        bytes32 s = keccak256(abi.encode(creator, salt));
+        return address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), s, initCodeHash)))));
+    }
+
+    function _excluded() internal view returns (address[] memory excl) {
+        excl = new address[](3);
+        excl[0] = address(poolManager);
+        excl[1] = address(hook);
+        excl[2] = DEAD;
+    }
+
+    // ---------------------------------------------------------------- launch
 
     function launch(LaunchParams calldata p) external payable returns (address token) {
         if (
@@ -107,19 +181,19 @@ contract LaunchFactory is IUnlockCallback {
             revert InvalidName();
         }
         if (p.supplyTier > MAX_SUPPLY_TIER) revert InvalidSupply();
+        if (!pairs[p.pair].enabled) revert PairNotEnabled();
+        if (p.pair == address(0) ? msg.value != p.devBuy : msg.value != 0) revert BadValue();
         uint256 supply = BASE_SUPPLY * 10 ** p.supplyTier;
 
-        address[] memory excl = new address[](3);
-        excl[0] = address(poolManager);
-        excl[1] = address(hook);
-        excl[2] = DEAD;
         token = address(
-            new LaunchToken{salt: keccak256(abi.encode(msg.sender, allTokens.length))}(
-                p.name, p.symbol, supply, address(this), address(hook), p.holders, excl
+            new LaunchToken{salt: keccak256(abi.encode(msg.sender, p.salt))}(
+                p.name, p.symbol, supply, address(this), address(hook), p.pair, p.holdersBps > 0, _excluded()
             )
         );
+        if (uint160(token) <= uint160(p.pair)) revert BadSalt();
+
         PoolKey memory key = PoolKey({
-            currency0: CurrencyLibrary.ADDRESS_ZERO,
+            currency0: Currency.wrap(p.pair),
             currency1: Currency.wrap(token),
             fee: 0,
             tickSpacing: TICK_SPACING,
@@ -127,38 +201,76 @@ contract LaunchFactory is IUnlockCallback {
         });
         _keys[token] = key;
         allTokens.push(token);
+        creatorOf[token] = msg.sender;
+        metadataEditable[token] = p.editable;
 
-        hook.register(key, token, msg.sender, supply, p.feeBps, p.antiSnipe, p.holders, p.recipients, p.shares);
-        int24 upper = tickFor(p.supplyTier);
+        hook.register(
+            key,
+            token,
+            msg.sender,
+            supply,
+            LaunchHook.Config(p.buyBps, p.sellBps, p.creatorBps, p.holdersBps, p.burnBps, p.antiSnipe),
+            p.recipients,
+            p.shares
+        );
+        int24 upper = tickFor(p.pair, p.supplyTier);
         poolManager.initialize(key, TickMath.getSqrtPriceAtTick(upper));
 
-        uint256 boughtTokens = abi.decode(
-            poolManager.unlock(abi.encode(key, msg.sender, msg.value, p.minTokensOut, supply, upper)), (uint256)
+        uint256 bought = abi.decode(
+            poolManager.unlock(abi.encode(key, msg.sender, p.devBuy, p.minTokensOut, supply, upper)), (uint256)
         );
 
         uint256 leftover = LaunchToken(token).balanceOf(address(this));
         if (leftover > 0) LaunchToken(token).transfer(DEAD, leftover);
+        uint256 refund = address(this).balance;
+        if (refund > 0) SafeTransferLib.safeTransferETH(msg.sender, refund);
 
+        _emitLaunched(token, key, p, supply, bought);
+    }
+
+    function _emitLaunched(address token, PoolKey memory key, LaunchParams calldata p, uint256 supply, uint256 bought)
+        internal
+    {
         emit TokenLaunched(
             token,
             msg.sender,
             key.toId(),
+            p.pair,
             p.name,
             p.symbol,
             p.metadataURI,
             supply,
-            p.feeBps,
-            p.holders,
+            p.buyBps,
+            p.sellBps,
+            p.creatorBps,
+            p.holdersBps,
+            p.burnBps,
             p.antiSnipe,
-            msg.value,
-            boughtTokens,
-            leftover
+            p.editable,
+            p.devBuy,
+            bought
         );
     }
 
+    // ---------------------------------------------------------------- metadata
+
+    function setMetadata(address token, string calldata metadataURI) external {
+        if (msg.sender != creatorOf[token]) revert NotCreator();
+        if (!metadataEditable[token]) revert MetadataLocked();
+        emit MetadataUpdated(token, metadataURI);
+    }
+
+    function freezeMetadata(address token) external {
+        if (msg.sender != creatorOf[token]) revert NotCreator();
+        metadataEditable[token] = false;
+        emit MetadataFrozen(token);
+    }
+
+    // ---------------------------------------------------------------- pool manager
+
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         if (msg.sender != address(poolManager)) revert NotPoolManager();
-        (PoolKey memory key, address creator, uint256 ethIn, uint256 minTokensOut, uint256 supply, int24 upper) =
+        (PoolKey memory key, address creator, uint256 devBuy, uint256 minTokensOut, uint256 supply, int24 upper) =
             abi.decode(data, (PoolKey, address, uint256, uint256, uint256, int24));
 
         int24 tickLower = TickMath.minUsableTick(TICK_SPACING);
@@ -182,17 +294,24 @@ contract LaunchFactory is IUnlockCallback {
         poolManager.settle();
 
         uint256 bought;
-        if (ethIn > 0) {
+        if (devBuy > 0) {
             BalanceDelta d = poolManager.swap(
                 key,
                 SwapParams({
                     zeroForOne: true,
-                    amountSpecified: -int256(ethIn),
+                    amountSpecified: -int256(devBuy),
                     sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
                 }),
                 abi.encode(creator)
             );
-            poolManager.settle{value: uint256(uint128(-d.amount0()))}();
+            uint256 paid = uint256(uint128(-d.amount0()));
+            if (key.currency0.isAddressZero()) {
+                poolManager.settle{value: paid}();
+            } else {
+                poolManager.sync(key.currency0);
+                ERC20(Currency.unwrap(key.currency0)).safeTransferFrom(creator, address(poolManager), paid);
+                poolManager.settle();
+            }
             bought = uint256(uint128(d.amount1()));
             if (bought < minTokensOut) revert InsufficientOutput();
             poolManager.take(key.currency1, creator, bought);
