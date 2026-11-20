@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import type { PairInfo } from "@/lib/config";
 
 export type PairKind = "stocks" | "crypto" | "memes";
@@ -49,7 +50,10 @@ export function PairPicker({ pairs, onPick, onClose }: { pairs: { p: PairInfo; i
         (!s || p.symbol.toLowerCase().includes(s) || p.name.toLowerCase().includes(s) || p.address.toLowerCase() === s),
     );
   }, [pairs, tab, q]);
-  return (
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
       <div className="flex max-h-[80dvh] w-full max-w-md flex-col rounded-t-3xl border border-line bg-panel p-4 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
@@ -88,6 +92,7 @@ export function PairPicker({ pairs, onPick, onClose }: { pairs: { p: PairInfo; i
           {list.length === 0 && <p className="py-8 text-center text-sm text-muted">No pairs found.</p>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

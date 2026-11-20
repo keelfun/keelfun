@@ -29,15 +29,16 @@ function Section({ n, title, sub, children }: { n: number; title: string; sub?: 
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, children, group }: { label: string; hint?: string; children: React.ReactNode; group?: boolean }) {
+  const Tag = group ? "div" : "label";
   return (
-    <label className="block">
+    <Tag className="block">
       <span className="mb-2 flex items-baseline justify-between text-sm font-medium text-fg">
         <span>{label}</span>
         {hint && <span className="text-dim">{hint}</span>}
       </span>
       {children}
-    </label>
+    </Tag>
   );
 }
 
@@ -280,7 +281,7 @@ export default function LaunchPage() {
                     <input className={`${input} uppercase`} value={symbol} maxLength={10} onChange={(e) => setSymbol(e.target.value.replace(/[^A-Za-z0-9]/g, ""))} placeholder="TOKEN" />
                   </Field>
                 </div>
-                <Field label="Paired asset *" hint="Uniswap v4">
+                <Field label="Paired asset *" hint="Uniswap v4" group>
                   <div className="grid grid-cols-3 gap-2">
                     {PAIRS.slice(0, 3).map((pr, i) => (
                       <button
