@@ -2,10 +2,10 @@
 import { Em, Faq, Num, PageHero } from "@/components/PageHero";
 import { useStats } from "@/lib/api";
 import { BRAND, FEE_TIERS } from "@/lib/config";
-import { fmtValue } from "@/lib/format";
+import { fmtEth, fmtValue } from "@/lib/format";
 
 const SHARE = 70;
-const eth = (n: number) => `${n.toLocaleString(undefined, { maximumFractionDigits: 4 })} ETH`;
+const eth = fmtEth;
 
 function Stat({ k, v, sub }: { k: string; v: string; sub?: string }) {
   return (
