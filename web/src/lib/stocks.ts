@@ -2,6 +2,7 @@
 export type Stock = { symbol: string; name: string; address: string; decimals: number; logo: string; issuer: string };
 
 export const STOCKS: Stock[] = [
+  { symbol: "ANTC", name: "Anthropic, PBC (Coinbase Tokenized Stock)", address: "0xb20000000000000000000016e38fd364d271ba28", decimals: 8, logo: "https://coin-images.coingecko.com/coins/images/102180335/large/ANTc-official.png", issuer: "Coinbase" },
   { symbol: "GOOGLC", name: "Alphabet (Coinbase Tokenized Stock)", address: "0xb2000000000000000000002d0ba3164cc74f58b7", decimals: 8, logo: "https://coin-images.coingecko.com/coins/images/102175598/large/goog_200x200.png?1787068802", issuer: "Coinbase" },
   { symbol: "NVDAC", name: "NVIDIA (Coinbase Tokenized Stock)", address: "0xb20000000000000000000078ee7ce2fe4908108c", decimals: 8, logo: "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801", issuer: "Coinbase" },
   { symbol: "METAC", name: "Meta (Coinbase Tokenized Stock)", address: "0xb2000000000000000000008bc8786b856e61707c", decimals: 8, logo: "https://coin-images.coingecko.com/coins/images/102175599/large/meta_200x200.png?1787068803", issuer: "Coinbase" },

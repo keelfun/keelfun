@@ -19,6 +19,7 @@ const PAIRS: Record<string, { symbol: string; decimals: number; tick: number }> 
   [ZERO]: { symbol: "ETH", decimals: 18, tick: 200_200 },
   "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": { symbol: "USDC", decimals: 6, tick: 402_000 },
   "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf": { symbol: "cbBTC", decimals: 8, tick: 466_200 },
+  "0xb20000000000000000000016e38fd364d271ba28": { symbol: "ANTC", decimals: 8, tick: 401200 },
   "0xb2000000000000000000002d0ba3164cc74f58b7": { symbol: "GOOGLC", decimals: 8, tick: 412000 },
   "0xb20000000000000000000078ee7ce2fe4908108c": { symbol: "NVDAC", decimals: 8, tick: 405600 },
   "0xb2000000000000000000008bc8786b856e61707c": { symbol: "METAC", decimals: 8, tick: 419800 },
