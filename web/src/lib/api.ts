@@ -91,10 +91,10 @@ const live = { refetchInterval: 4000, staleTime: 2000 };
 
 export const useStats = () => useQuery({ queryKey: ["stats"], queryFn: () => api<Stats>("/stats"), ...live });
 
-export const useTokens = (sort: string, q = "") =>
+export const useTokens = (sort: string, q = "", pair = "") =>
   useQuery({
-    queryKey: ["tokens", sort, q],
-    queryFn: () => api<{ tokens: Token[]; ethUsd: number }>(`/tokens?sort=${sort}&q=${encodeURIComponent(q)}&limit=60`),
+    queryKey: ["tokens", sort, q, pair],
+    queryFn: () => api<{ tokens: Token[]; ethUsd: number }>(`/tokens?sort=${sort}&q=${encodeURIComponent(q)}&limit=60${pair ? `&pair=${pair}` : ""}`),
     ...live,
   });
 

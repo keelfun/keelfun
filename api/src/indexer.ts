@@ -675,14 +675,25 @@ export class Indexer extends DurableObject<Env> {
       conds.push("t.creator = ?");
       extra.push(lc(q.get("creator")!));
     }
+    if (q.get("pair")) {
+      conds.push("t.pair = ?");
+      extra.push(lc(q.get("pair")!));
+    }
     const orderBy: Record<string, string> = {
       trending: "vol_24h DESC, t.last_trade_ts DESC, t.launch_ts DESC",
       new: "t.launch_ts DESC",
       top: "t.price * t.supply DESC",
       holders: "holders DESC",
       volume: "t.volume DESC",
+      active: "t.last_trade_ts DESC, t.launch_ts DESC",
     };
     const base = this.tokenSelect(conds.length ? `WHERE ${conds.join(" AND ")}` : "");
+    if (sort === "top" || sort === "volume") {
+      const all = this.sql.exec(base.sql, ...base.binds, ...extra).toArray().map((r) => this.formatToken(r));
+      const key = sort === "top" ? "fdvEth" : "volume24hEth";
+      all.sort((a, b) => Number(b[key]) - Number(a[key]) || Number(b.fdvEth) - Number(a.fdvEth));
+      return { tokens: all.slice(offset, offset + limit), ethUsd: this.ethUsd() };
+    }
     const rows = this.sql
       .exec(`${base.sql} ORDER BY ${orderBy[sort] ?? orderBy.trending} LIMIT ${limit} OFFSET ${offset}`, ...base.binds, ...extra)
       .toArray();
