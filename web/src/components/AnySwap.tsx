@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { erc20Abi, formatUnits, parseUnits } from "viem";
 import { useAccount, useBalance, useReadContract, useSendTransaction } from "wagmi";
 import { chain } from "@/lib/config";
+import { STOCKS } from "@/lib/stocks";
 import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
 
 type Cur = { address: string; symbol: string; name: string; decimals: number; logo?: string };
@@ -64,10 +65,17 @@ function useBal(c: Cur, address?: `0x${string}`) {
 
 function Picker({ onPick, onClose }: { onPick: (c: Cur) => void; onClose: () => void }) {
   const [q, setQ] = useState("");
+  const [tab, setTab] = useState<"all" | "stocks">("all");
   const [list, setList] = useState<Cur[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let live = true;
+    if (tab === "stocks") {
+      const t = q.trim().toLowerCase();
+      setList(STOCKS.filter((c) => !t || c.symbol.toLowerCase().includes(t) || c.name.toLowerCase().includes(t) || c.address === t));
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const t = setTimeout(() => {
       search(q.trim())
@@ -79,13 +87,20 @@ function Picker({ onPick, onClose }: { onPick: (c: Cur) => void; onClose: () => 
       live = false;
       clearTimeout(t);
     };
-  }, [q]);
+  }, [q, tab]);
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
       <div className="flex max-h-[80dvh] w-full max-w-md flex-col rounded-t-3xl border border-line bg-panel p-4 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <p className="font-medium">Select a token</p>
           <button onClick={onClose} className="text-muted hover:text-fg">✕</button>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-bg p-1">
+          {(["all", "stocks"] as const).map((t) => (
+            <button key={t} onClick={() => setTab(t)} className={`h-8 rounded-lg text-sm font-medium ${tab === t ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}>
+              {t === "all" ? "All tokens" : "Stocks"}
+            </button>
+          ))}
         </div>
         <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or paste address" className="mt-3 h-11 w-full rounded-xl border border-line bg-bg/60 px-3 text-sm outline-none placeholder:text-dim focus:border-accent/50" />
         <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
@@ -95,6 +110,9 @@ function Picker({ onPick, onClose }: { onPick: (c: Cur) => void; onClose: () => 
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{c.symbol}</p>
                 <p className="truncate text-xs text-dim">{c.name}</p>
+              </div>
+              {"issuer" in c && <span className="ml-auto shrink-0 rounded-md border border-line px-1.5 py-0.5 text-[10px] text-muted">{String(c.issuer)}</span>}
+              <div className="hidden">
               </div>
             </button>
           ))}
