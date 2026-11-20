@@ -27,7 +27,7 @@ function safeParse(v: string, decimals = 18): bigint {
   }
 }
 
-export function TradePanel({ token }: { token: Token }) {
+export function TradePanel({ token, defaultSide = "buy" }: { token: Token; defaultSide?: "buy" | "sell" }) {
   const { address } = useAccount();
   const client = usePublicClient({ chainId: chain.id });
   const ensureWallet = useEnsureWallet();
@@ -35,7 +35,7 @@ export function TradePanel({ token }: { token: Token }) {
   const { writeContractAsync } = useWriteContract();
   const pair = pairInfo(token.pair);
   const native = pair.symbol === "ETH";
-  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [side, setSide] = useState<"buy" | "sell">(defaultSide);
   const [amount, setAmount] = useState("");
   const [slippage, setSlippage] = useState(5);
   const [busy, setBusy] = useState<string | null>(null);
