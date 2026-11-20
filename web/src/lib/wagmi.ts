@@ -1,8 +1,10 @@
-import { createConfig, http, type CreateConnectorFn, type Transport } from "wagmi";
+import { createConfig, fallback, http, type CreateConnectorFn, type Transport } from "wagmi";
 import { injected } from "@wagmi/core";
 import { walletConnect } from "@wagmi/connectors/walletConnect";
 import { arbitrum, linea, mainnet, optimism } from "viem/chains";
 import { BRAND, chain, RPC_URL, WC_PROJECT_ID } from "./config";
+
+const BASE_RPCS = ["https://base-rpc.publicnode.com", "https://base.drpc.org", "https://gateway.tenderly.co/public/base", "https://base.llamarpc.com"];
 
 export const BRIDGE_CHAINS = [mainnet, arbitrum, optimism, linea] as const;
 
@@ -26,7 +28,7 @@ if (WC_PROJECT_ID) {
 export const wagmiConfig = createConfig({
   chains: [chain, ...BRIDGE_CHAINS],
   connectors,
-  transports: { ...Object.fromEntries(BRIDGE_CHAINS.map((c) => [c.id, http()])), [chain.id]: http(RPC_URL) } as Record<number, Transport>,
+  transports: { ...Object.fromEntries(BRIDGE_CHAINS.map((c) => [c.id, http()])), [chain.id]: chain.id === 8453 ? fallback([...BASE_RPCS.map((u) => http(u)), http(RPC_URL)]) : http(RPC_URL) } as Record<number, Transport>,
   ssr: true,
 });
 
