@@ -76,7 +76,7 @@ export type Stats = { chainId: number; ethUsd: number; tokens: number; volumeEth
 export type Portfolio = {
   holdings: { token: Token; amount: number; valueEth: number; valueUsd: number }[];
   created: Token[];
-  trades: (Omit<Trade, "trader" | "fee" | "block"> & { token: string; symbol: string; name: string; image: string | null })[];
+  trades: (Omit<Trade, "trader" | "fee" | "block"> & { token: string; symbol: string; name: string; image: string | null; pair?: string })[];
   ethUsd: number;
 };
 

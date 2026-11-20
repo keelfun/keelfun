@@ -2,144 +2,271 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { formatEther, isAddress } from "viem";
-import { useAccount } from "wagmi";
+import { formatUnits, isAddress } from "viem";
+import { useAccount, useReadContracts } from "wagmi";
 import { ConnectButton } from "@/components/ConnectButton";
 import { Em, PageHero } from "@/components/PageHero";
 import { TokenAvatar } from "@/components/TokenAvatar";
-import { useClaim, useClaimable } from "@/components/FeesCard";
-import { usePortfolio, type Token } from "@/lib/api";
-import { fmtCompact, fmtEth, fmtValue, shortAddr, timeAgo } from "@/lib/format";
+import { useClaim } from "@/components/FeesCard";
+import { launchHookAbi, launchTokenAbi } from "@/lib/abis";
+import { usePortfolio, type Portfolio, type Token } from "@/lib/api";
+import { ADDR, EXPLORER, chain, pairInfo } from "@/lib/config";
+import { fmtCompact, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
 
-function ClaimRow({ t, ethUsd, own, wallet }: { t: Token; ethUsd: number; own: boolean; wallet: `0x${string}` }) {
-  const c = useClaimable(t, wallet);
-  const { busy, err, run } = useClaim(t, c.refetch);
-  const amount = Number(formatEther(c.route));
-  const claim = () => run("route");
+const th = "pb-3 text-left text-xs font-normal text-dim";
+const amt = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: v >= 1 ? 4 : 6 });
+const usdOf = (t: Token, raw: bigint, ethUsd: number) => Number(formatUnits(raw, t.pairDecimals)) * t.pairEth * ethUsd;
 
+function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub: string }) {
   return (
-    <div className="flex items-center gap-3 border-t border-line px-4 py-3 first:border-0">
-      <Link href={`/token/?a=${t.address}`} className="flex min-w-0 flex-1 items-center gap-3">
-        <TokenAvatar src={t.image} symbol={t.symbol} size={36} />
-        <div className="min-w-0">
-          <p className="truncate text-sm">{t.name}</p>
-          <p className="font-mono text-xs text-dim">
-            FDV {fmtValue(t.fdvEth, ethUsd)} · {timeAgo(t.createdAt)}
-          </p>
-        </div>
-      </Link>
-      <div className="text-right">
-        <p className="font-mono text-sm">{t.holdersRoute ? "holders" : fmtEth(amount)}</p>
-        <p className="text-[11px] text-dim">claimable</p>
-        {err && <p className="max-w-40 truncate text-[11px] text-down">{err}</p>}
-      </div>
-      {own && !t.holdersRoute && (
-        <button
-          onClick={claim}
-          disabled={!!busy || amount === 0}
-          className="h-8 rounded-lg bg-accent px-3 text-xs font-semibold text-accent-ink disabled:opacity-40"
-        >
-          {busy ? "…" : "Claim"}
-        </button>
-      )}
+    <div className="border-t border-line pt-5">
+      <p className="text-xs text-dim">{label}</p>
+      <p className="mt-4 font-mono text-2xl text-fg sm:text-3xl">{value}</p>
+      <p className="mt-4 text-xs text-dim">{sub}</p>
     </div>
   );
+}
+
+function Skeleton({ cols, rows = 5 }: { cols: number; rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }, (_, i) => (
+        <tr key={i} className="border-t border-line/60">
+          <td className="py-4">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-panel-2" />
+              <div className="space-y-2">
+                <div className="h-2.5 w-28 rounded bg-panel-2" />
+                <div className="h-2 w-16 rounded bg-panel-2/70" />
+              </div>
+            </div>
+          </td>
+          {Array.from({ length: cols - 1 }, (_, j) => (
+            <td key={j} className="py-4">
+              <div className="ml-auto h-2.5 w-14 rounded bg-panel-2" />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-bg/40 via-bg/80 to-bg/40 text-center text-sm">{children}</div>;
+}
+
+function TokenCell({ t, sub }: { t: { address: string; image: string | null; symbol: string; name: string }; sub?: React.ReactNode }) {
+  return (
+    <Link href={`/token/?a=${t.address}`} className="flex min-w-0 items-center gap-3 hover:text-accent">
+      <TokenAvatar src={t.image} symbol={t.symbol} size={36} />
+      <div className="min-w-0">
+        <p className="truncate text-sm">{t.name}</p>
+        <p className="truncate font-mono text-xs text-dim">{sub ?? `$${t.symbol}`}</p>
+      </div>
+    </Link>
+  );
+}
+
+function ClaimBtn({ t, kind, disabled, onDone }: { t: Token; kind: "route" | "holder"; disabled: boolean; onDone: () => unknown }) {
+  const { busy, err, run } = useClaim(t, onDone);
+  return (
+    <span className="inline-flex flex-col items-end">
+      <button onClick={() => run(kind)} disabled={!!busy || disabled} className="h-7 rounded-md bg-accent px-3 text-xs font-semibold text-accent-ink disabled:opacity-30">
+        {busy ? "…" : "Claim"}
+      </button>
+      {err && <span className="mt-1 max-w-40 truncate text-[11px] text-down">{err}</span>}
+    </span>
+  );
+}
+
+function useEarnings(data: Portfolio | undefined, wallet?: `0x${string}`) {
+  const held = (data?.holdings ?? []).map((h) => h.token).filter((t) => t.holdersBps > 0);
+  const created = data?.created ?? [];
+  const q = useReadContracts({
+    contracts: [
+      ...held.map((t) => ({ address: t.address, abi: launchTokenAbi, functionName: "claimable", args: [wallet!], chainId: chain.id }) as const),
+      ...created.map((t) => ({ address: ADDR.hook, abi: launchHookAbi, functionName: "accrued", args: [t.address, wallet!], chainId: chain.id }) as const),
+    ],
+    query: { enabled: !!wallet && held.length + created.length > 0, refetchInterval: 10000 },
+  });
+  const val = (i: number) => (q.data?.[i]?.result as bigint | undefined) ?? 0n;
+  const holder = new Map(held.map((t, i) => [t.address.toLowerCase(), val(i)]));
+  const route = new Map(created.map((t, i) => [t.address.toLowerCase(), val(held.length + i)]));
+  return { holder, route, loaded: !!q.data || held.length + created.length === 0, refetch: q.refetch };
 }
 
 function PortfolioView() {
   const params = useSearchParams();
   const { address } = useAccount();
   const viewing = params.get("w");
-  const wallet = viewing && isAddress(viewing) ? viewing : address;
+  const wallet = (viewing && isAddress(viewing) ? viewing : address) as `0x${string}` | undefined;
   const own = !!address && wallet?.toLowerCase() === address.toLowerCase();
   const { data, isLoading } = usePortfolio(wallet);
-
-  if (!wallet)
-    return (
-      <PageHero title={<>Your <Em>portfolio</Em></>} sub="Connect a wallet to see your holdings, your launches and the fees you can claim.">
-        <div className="mt-7">
-          <ConnectButton />
-        </div>
-      </PageHero>
-    );
-
+  const e = useEarnings(data, wallet);
   const ethUsd = data?.ethUsd ?? 0;
-  const total = data?.holdings.reduce((a, h) => a + h.valueEth, 0) ?? 0;
+  const ready = !!wallet && !!data;
+
+  const holdUsd = data?.holdings.reduce((a, h) => a + h.valueEth * ethUsd, 0) ?? 0;
+  const earnedUsd = data?.holdings.reduce((a, h) => a + usdOf(h.token, e.holder.get(h.token.address.toLowerCase()) ?? 0n, ethUsd), 0) ?? 0;
+  const feesUsd = data?.created.reduce((a, t) => a + usdOf(t, e.route.get(t.address.toLowerCase()) ?? 0n, ethUsd), 0) ?? 0;
+  const dash = <span className="text-dim">—</span>;
 
   return (
-    <div className="space-y-6 py-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs text-dim">{own ? "Your portfolio" : "Portfolio"}</p>
-          <h1 className="font-mono text-xl sm:text-2xl">{shortAddr(wallet)}</h1>
+    <>
+      <PageHero
+        title={<>{own || !wallet ? "Your" : shortAddr(wallet)} <Em>portfolio</Em></>}
+        sub="What you hold and what it has paid you, the tokens you launched and the fees they pay you."
+      >
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+          {wallet ? <p className="font-mono text-xs text-dim">{shortAddr(wallet)}</p> : <span />}
+          <Link href="/launch/" className="rounded-lg border border-line bg-bg/60 px-4 py-2 text-sm hover:border-accent">
+            Launch a token
+          </Link>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-dim">Holdings value</p>
-          <p className="font-mono text-xl sm:text-2xl">{fmtValue(total, ethUsd)}</p>
+      </PageHero>
+
+      <div className="space-y-16 pb-16">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-4">
+          <Stat label="Holdings" value={ready ? fmtUsd(holdUsd) : dash} sub="the tokens you hold" />
+          <Stat label="Earned from holding" value={ready && e.loaded ? fmtUsd(earnedUsd) : dash} sub="paid to you and still to come" />
+          <Stat label="Creator fees to claim" value={ready && e.loaded ? fmtUsd(feesUsd) : dash} sub="from tokens that pay you" />
+          <Stat label="Launched" value={ready ? data.created.length : dash} sub="the tokens you created" />
         </div>
-      </div>
 
-      <section className="rounded-2xl border border-line bg-panel">
-        <h2 className="border-b border-line px-4 py-3 text-sm">Holdings</h2>
-        {isLoading ? (
-          <p className="p-6 text-center text-xs text-dim">Loading…</p>
-        ) : data?.holdings.length ? (
-          data.holdings.map((h) => (
-            <Link key={h.token.address} href={`/token/?a=${h.token.address}`} className="flex items-center gap-3 border-t border-line px-4 py-3 first:border-0 hover:bg-panel-2">
-              <TokenAvatar src={h.token.image} symbol={h.token.symbol} size={36} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm">{h.token.name}</p>
-                <p className="font-mono text-xs text-dim">
-                  {fmtCompact(h.amount)} {h.token.symbol}
-                </p>
-              </div>
-              <p className="font-mono text-sm">{fmtValue(h.valueEth, ethUsd)}</p>
-            </Link>
-          ))
-        ) : (
-          <p className="p-6 text-center text-xs text-dim">No holdings yet.</p>
-        )}
-      </section>
-
-      <section className="rounded-2xl border border-line bg-panel">
-        <h2 className="border-b border-line px-4 py-3 text-sm">Launched tokens &amp; fee claims</h2>
-        {data?.created.length ? (
-          data.created.map((t) => <ClaimRow key={t.address} t={t} ethUsd={ethUsd} own={own} wallet={wallet as `0x${string}`} />)
-        ) : (
-          <p className="p-6 text-center text-xs text-dim">
-            No launches yet.{" "}
-            {own && (
-              <Link href="/launch/" className="text-accent hover:underline">
-                Launch one →
-              </Link>
-            )}
-          </p>
-        )}
-      </section>
-
-      <section className="rounded-2xl border border-line bg-panel">
-        <h2 className="border-b border-line px-4 py-3 text-sm">Recent trades</h2>
-        {data?.trades.length ? (
-          <table className="w-full font-mono text-xs">
-            <tbody>
-              {data.trades.map((r) => (
-                <tr key={r.id} className="border-t border-line/60 first:border-0">
-                  <td className="px-4 py-2 text-dim">{timeAgo(r.ts)}</td>
-                  <td className={`px-2 py-2 ${r.isBuy ? "text-up" : "text-down"}`}>{r.isBuy ? "buy" : "sell"}</td>
-                  <td className="px-2 py-2">
-                    <Link href={`/token/?a=${r.token}`} className="hover:text-accent">${r.symbol}</Link>
-                  </td>
-                  <td className="px-2 py-2 text-right">{fmtCompact(r.tokens)}</td>
-                  <td className="px-4 py-2 text-right">{fmtEth(r.eth)}</td>
+        <section>
+          <h2 className="mb-6 font-serif text-4xl">Holdings</h2>
+          <div className="relative overflow-x-auto">
+            <table className="w-full min-w-[560px]">
+              <thead>
+                <tr>
+                  <th className={th}>Token</th>
+                  <th className={`${th} !text-right`}>Balance</th>
+                  <th className={`${th} !text-right`}>Value</th>
+                  <th className={`${th} !text-right`}>Earned</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="p-6 text-center text-xs text-dim">No trades yet.</p>
+              </thead>
+              <tbody className="font-mono text-sm">
+                {ready && data.holdings.length ? (
+                  data.holdings.map((h) => {
+                    const p = pairInfo(h.token.pair);
+                    const raw = e.holder.get(h.token.address.toLowerCase()) ?? 0n;
+                    return (
+                      <tr key={h.token.address} className="border-t border-line/60">
+                        <td className="py-3.5"><TokenCell t={h.token} /></td>
+                        <td className="py-3.5 text-right">{fmtCompact(h.amount)}</td>
+                        <td className="py-3.5 text-right">{fmtUsd(h.valueEth * ethUsd)}</td>
+                        <td className="py-3.5 text-right">
+                          {h.token.holdersBps > 0 ? (
+                            <div className="flex items-center justify-end gap-3">
+                              <span>{amt(Number(formatUnits(raw, p.decimals)))} <span className="text-dim">{p.symbol}</span></span>
+                              {own && <ClaimBtn t={h.token} kind="holder" disabled={raw === 0n} onDone={e.refetch} />}
+                            </div>
+                          ) : (
+                            <span className="text-dim">no dividends</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <Skeleton cols={4} />
+                )}
+              </tbody>
+            </table>
+            {!wallet ? (
+              <Empty>
+                <p>Connect a wallet to see your portfolio.</p>
+                <ConnectButton />
+              </Empty>
+            ) : isLoading ? (
+              <Empty><p className="text-dim">Loading…</p></Empty>
+            ) : ready && !data.holdings.length ? (
+              <Empty><p className="text-dim">No holdings yet. <Link href="/" className="text-accent hover:underline">Explore markets →</Link></p></Empty>
+            ) : null}
+          </div>
+        </section>
+
+        {ready && data.created.length > 0 && (
+          <section>
+            <h2 className="mb-6 font-serif text-4xl">Launched</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px]">
+                <thead>
+                  <tr>
+                    <th className={th}>Token</th>
+                    <th className={`${th} !text-right`}>Market cap</th>
+                    <th className={`${th} !text-right`}>Lifetime fees</th>
+                    <th className={`${th} !text-right`}>To claim</th>
+                  </tr>
+                </thead>
+                <tbody className="font-mono text-sm">
+                  {data.created.map((t) => {
+                    const p = pairInfo(t.pair);
+                    const raw = e.route.get(t.address.toLowerCase()) ?? 0n;
+                    return (
+                      <tr key={t.address} className="border-t border-line/60">
+                        <td className="py-3.5"><TokenCell t={t} sub={`$${t.symbol} · ${p.symbol} · ${timeAgo(t.createdAt)}`} /></td>
+                        <td className="py-3.5 text-right">{fmtUsd(t.fdvEth * ethUsd)}</td>
+                        <td className="py-3.5 text-right">{fmtUsd(t.routeFeesEth * ethUsd)}</td>
+                        <td className="py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            <span>{amt(Number(formatUnits(raw, p.decimals)))} <span className="text-dim">{p.symbol}</span></span>
+                            {own && <ClaimBtn t={t} kind="route" disabled={raw === 0n} onDone={e.refetch} />}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
         )}
-      </section>
-    </div>
+
+        <section>
+          <h2 className="mb-6 font-serif text-4xl">Trades</h2>
+          <div className="relative overflow-x-auto">
+            <table className="w-full min-w-[640px]">
+              <thead>
+                <tr className="border-b border-line">
+                  <th className={th}>Token</th>
+                  <th className={`${th} !text-right`}>Side</th>
+                  <th className={`${th} !text-right`}>Tokens</th>
+                  <th className={`${th} !text-right`}>Paid or received</th>
+                  <th className={`${th} !text-right`}>Transaction</th>
+                </tr>
+              </thead>
+              <tbody className="font-mono text-sm">
+                {ready && data.trades.length ? (
+                  data.trades.map((r) => {
+                    const p = pairInfo(r.pair);
+                    return (
+                      <tr key={r.id} className="border-t border-line/60">
+                        <td className="py-3.5"><TokenCell t={{ address: r.token, image: r.image, symbol: r.symbol, name: r.name }} /></td>
+                        <td className={`py-3.5 text-right ${r.isBuy ? "text-up" : "text-down"}`}>{r.isBuy ? "Buy" : "Sell"}</td>
+                        <td className="py-3.5 text-right">{fmtCompact(r.tokens)}</td>
+                        <td className="py-3.5 text-right">{amt(r.pairAmount ?? r.eth)} <span className="text-dim">{r.pair ? p.symbol : "ETH"}</span></td>
+                        <td className="py-3.5 text-right">
+                          <a href={`${EXPLORER}/tx/${r.tx}`} target="_blank" rel="noreferrer" className="text-dim hover:text-accent">
+                            {timeAgo(r.ts)} ↗
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <Skeleton cols={5} rows={4} />
+                )}
+              </tbody>
+            </table>
+            {!(ready && data.trades.length) && (
+              <Empty><p className="text-muted">Your buys and sells in every Keel market, newest first.</p></Empty>
+            )}
+          </div>
+        </section>
+      </div>
+    </>
   );
 }
 

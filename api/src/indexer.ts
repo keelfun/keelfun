@@ -878,7 +878,7 @@ export class Indexer extends DurableObject<Env> {
       .toArray()
       .map((t) => ({
         id: t.id, token: t.token, symbol: t.symbol, name: t.name, image: t.image, isBuy: Boolean(t.is_buy),
-        eth: Number(t.eth) * this.pairEth(t.pair), tokens: t.tokens, priceEth: Number(t.price) * this.pairEth(t.pair), ts: t.ts, tx: t.tx,
+        eth: Number(t.eth) * this.pairEth(t.pair), tokens: t.tokens, priceEth: Number(t.price) * this.pairEth(t.pair), ts: t.ts, tx: t.tx, pair: t.pair, pairAmount: Number(t.eth),
       }));
     return { holdings, created, trades, ethUsd: this.ethUsd() };
   }
