@@ -72,3 +72,53 @@ input[type="number"] {
   background-clip: text;
   color: transparent;
 }
+
+@keyframes chart-flow {
+  to { stroke-dashoffset: -60px; }
+}
+@keyframes chart-draw {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+@keyframes ping-ring {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+@keyframes value-flash {
+  0% { color: var(--color-up); text-shadow: 0 0 18px rgb(46 230 166 / 0.6); }
+  100% { color: inherit; text-shadow: none; }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.anim-chart-line { stroke-dasharray: 20 10; animation: chart-flow 3.6s linear infinite; }
+.anim-chart-draw { animation: chart-draw 1.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-float { animation: float-y 6s ease-in-out infinite; }
+.anim-marquee { animation: marquee 150s linear infinite; }
+.anim-marquee:hover { animation-play-state: paused; }
+.anim-ping { animation: ping-ring 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+.anim-flash { animation: value-flash 1.4s ease-out; }
+.anim-rise { animation: rise-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.card-glow { position: relative; overflow: hidden; }
+.card-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(28rem 12rem at var(--mx, 50%) -4rem, rgb(61 123 255 / 0.16), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.card-glow:hover::before { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-chart-line, .anim-chart-draw, .anim-float, .anim-marquee, .anim-ping, .anim-flash, .anim-rise { animation: none !important; }
+}

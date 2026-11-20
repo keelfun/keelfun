@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { TokenCard } from "@/components/TokenCard";
+import { HeroChart } from "@/components/HeroChart";
+import { PairTicker } from "@/components/PairTicker";
 import { useStats, useTokens } from "@/lib/api";
 import { BRAND, chain, DEPLOYED } from "@/lib/config";
 import { fmtCompact, fmtValue } from "@/lib/format";
@@ -31,7 +33,8 @@ export default function Home() {
         <img src="/art/hero.webp" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-[70%_40%] opacity-90" />
         <div className="absolute inset-0 bg-gradient-to-r from-bg/85 via-bg/30 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-b from-bg/30 via-transparent to-bg" />
-        <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-16 sm:px-6 sm:pb-14 sm:pt-28">
+        <HeroChart featured={data?.tokens[0]} ethUsd={ethUsd} />
+        <div className="anim-rise relative mx-auto max-w-7xl px-4 pb-10 pt-16 sm:px-6 sm:pb-14 sm:pt-28">
           <h1 className="max-w-3xl font-serif text-[44px] leading-[1.02] tracking-tight sm:text-7xl">
             The steady way to <em className="text-[#bcd3ff]">launch</em> on Base
           </h1>
@@ -72,6 +75,7 @@ export default function Home() {
         </div>
       </section>
 
+      <PairTicker />
       <h2 id="markets" className="mb-3 mt-4 scroll-mt-28 font-serif text-4xl sm:text-5xl">Markets</h2>
       <div className="sticky top-[97px] z-30 -mx-4 mb-4 flex flex-col gap-3 border-b border-line bg-bg/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:top-14 md:flex-row md:items-center">
         <div className="no-scrollbar flex gap-1 overflow-x-auto">
@@ -103,8 +107,8 @@ export default function Home() {
         </div>
       ) : data && data.tokens.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {data.tokens.map((t) => (
-            <TokenCard key={t.address} t={t} ethUsd={ethUsd} />
+          {data.tokens.map((t, i) => (
+            <TokenCard key={t.address} t={t} ethUsd={ethUsd} i={i} />
           ))}
         </div>
       ) : (
