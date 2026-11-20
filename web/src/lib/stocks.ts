@@ -2,6 +2,10 @@
 export type Stock = { symbol: string; name: string; address: string; decimals: number; logo: string; issuer: string };
 
 export const STOCKS: Stock[] = [
+  { symbol: "HOODC", name: "Robinhood Markets (Coinbase Tokenized Stock)", address: "0xb2000000000000000000006f944897540579d3f2", decimals: 8, logo: "https://coin-images.coingecko.com/coins/images/102180359/large/HOODc-official.png", issuer: "Coinbase" },
+  { symbol: "KOC", name: "The Coca-Cola Company (Coinbase Tokenized Stock)", address: "0xb200000000000000000000ffef181db6dc5ed6a3", decimals: 8, logo: "https://coin-images.coingecko.com/coins/images/102180360/large/KOc-official.png", issuer: "Coinbase" },
+  { symbol: "MCDC", name: "McDonald's Corporation (Coinbase Tokenized Stock)", address: "0xb200000000000000000000d2f4cf2f7debb244bb", decimals: 8, logo: "https://coin-images.coingecko.com/coins/images/102180358/large/MCDc-official.png", issuer: "Coinbase" },
+  { symbol: "WTGRND", name: "Grindr (ST0x Tokenized Stock)", address: "0x1197e6fa778c4d13e47875bd1761c68c22c928e0", decimals: 18, logo: "https://coin-images.coingecko.com/coins/images/102178255/large/GRND.png", issuer: "ST0x" },
   { symbol: "AAOIC", name: "Applied Optoelectronics Inc (Coinbase Tokenized Stock)", address: "0xb200000000000000000000cf36d05963a3e2205c", decimals: 8, logo: "https://coin-images.coingecko.com/coins/images/102179198/large/AAOIc-icon-200.png", issuer: "Coinbase" },
   { symbol: "ARMC", name: "Arm Holdings plc (Coinbase Tokenized Stock)", address: "0xb20000000000000000000026215d755356e5043f", decimals: 8, logo: "https://coin-images.coingecko.com/coins/images/102179456/large/ARMc-icon-200.png", issuer: "Coinbase" },
   { symbol: "ASTSC", name: "AST SpaceMobile, Inc. (Coinbase Tokenized Stock)", address: "0xb200000000000000000000b1a29cf17a1819288a", decimals: 8, logo: "https://coin-images.coingecko.com/coins/images/102179162/large/ASTSc-icon-200.png", issuer: "Coinbase" },
