@@ -84,19 +84,6 @@ function Header({ t }: { t: Token }) {
   );
 }
 
-function Warning() {
-  const [open, setOpen] = useState(false);
-  return (
-    <button onClick={() => setOpen((v) => !v)} className="flex w-full items-start gap-2.5 rounded-xl border border-warn/40 bg-warn/5 px-4 py-2.5 text-left text-xs leading-relaxed text-muted">
-      <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-warn" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v5m0 3h.01" /></svg>
-      <span className={open ? "" : "line-clamp-1"}>
-        <b className="text-warn">Warning</b> Keel tokens cannot mint more supply, pause or freeze trading, or remove the locked liquidity. Taxes are fixed at launch. Always check holders, pool liquidity and a live sell quote. Copycats with the same name may exist, so check the contract address. DYOR!
-      </span>
-      <span className={`ml-auto text-dim transition-transform ${open ? "rotate-180" : ""}`}>⌄</span>
-    </button>
-  );
-}
-
 function Stats({ t, ethUsd }: { t: Token; ethUsd: number }) {
   const inPair = (eth: number) => (t.pairEth > 0 ? `${fmtCompact(eth / t.pairEth, 4)} ${t.pairSymbol}` : "");
   const items: [string, string, string][] = [
@@ -305,7 +292,6 @@ function TokenBody({ t, ethUsd }: { t: Token; ethUsd: number }) {
   return (
     <div className="space-y-5 pb-24 pt-5 lg:pb-6">
       <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">← All tokens</Link>
-      <Warning />
       <Header t={t} />
       <Stats t={t} ethUsd={ethUsd} />
       <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
