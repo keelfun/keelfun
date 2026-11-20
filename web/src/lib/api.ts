@@ -58,6 +58,7 @@ export type Token = {
 
 export type Trade = {
   id: string;
+  pairAmount?: number;
   trader: string;
   isBuy: boolean;
   eth: number;
@@ -113,6 +114,15 @@ export const useTrades = (address?: string) =>
     queryFn: () => api<{ trades: Trade[] }>(`/tokens/${address}/trades?limit=60`),
     enabled: !!address,
     ...live,
+  });
+
+export type FeeEvent = { id: string; kind: "buy_tax" | "sell_tax" | "claim" | "holders" | "burn"; who: string; amount: number; tokens: number; ts: number; block: number; tx: string };
+export const useFees = (address?: string) =>
+  useQuery({
+    queryKey: ["fees", address],
+    queryFn: () => api<{ fees: FeeEvent[]; pairEth: number }>(`/tokens/${address}/fees`),
+    enabled: !!address,
+    refetchInterval: 8000,
   });
 
 export const useHolders = (address?: string) =>

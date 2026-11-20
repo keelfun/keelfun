@@ -181,6 +181,8 @@ export class Indexer extends DurableObject<Env> {
       );
       CREATE INDEX IF NOT EXISTS trades_token_ts ON trades(token, ts);
       CREATE INDEX IF NOT EXISTS trades_trader ON trades(trader);
+      CREATE TABLE IF NOT EXISTS fee_events (id TEXT PRIMARY KEY, token TEXT, kind TEXT, who TEXT, amount REAL, tokens REAL, ts INTEGER, block INTEGER, tx TEXT);
+      CREATE INDEX IF NOT EXISTS fee_events_token ON fee_events(token, block);
       CREATE TABLE IF NOT EXISTS balances (token TEXT, holder TEXT, amount TEXT, PRIMARY KEY (token, holder));
       CREATE INDEX IF NOT EXISTS balances_holder ON balances(holder);
       CREATE TABLE IF NOT EXISTS uploads (id TEXT PRIMARY KEY, mime TEXT, data BLOB, created INTEGER);
@@ -351,7 +353,7 @@ export class Indexer extends DurableObject<Env> {
     }
     const transfers = parseEventLogs({ abi: launchTokenAbi, logs: transferLogs.map(toViemLog), eventName: "Transfer", strict: false });
 
-    const timed = core.filter((l) => l.eventName === "TokenLaunched" || l.eventName === "Trade");
+    const timed = core.filter((l) => ["TokenLaunched", "Trade", "FeesClaimed", "HoldersFlushed", "Burned"].includes(String(l.eventName)));
     const blocks = [...new Set([...timed, ...transfers].map((l) => Number(l.blockNumber)))];
     const ts = await this.rpc.blockTimestamps(blocks);
 
@@ -429,9 +431,25 @@ export class Indexer extends DurableObject<Env> {
              WHERE address = ?`,
             price, netSold, poolDelta, eth, time, unit(a.creatorFee), unit(a.platformFee), token,
           );
+        } else if (l.eventName === "FeesClaimed" || l.eventName === "HoldersFlushed") {
+          const a = l.args as { token: string; recipient?: string; amount: bigint };
+          const token = lc(a.token);
+          const pd = pairOf(this.sql.exec("SELECT pair FROM tokens WHERE address = ?", token).toArray()[0]?.pair).decimals;
+          this.sql.exec(
+            "INSERT OR IGNORE INTO fee_events (id, token, kind, who, amount, tokens, ts, block, tx) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)",
+            `${l.transactionHash}:${l.logIndex}`, token, l.eventName === "FeesClaimed" ? "claim" : "holders", a.recipient ? lc(a.recipient) : "",
+            Number(a.amount) / 10 ** pd, time, block, l.transactionHash,
+          );
         } else if (l.eventName === "Burned") {
-          const a = l.args as { token: string; tokensBurned: bigint };
+          const a = l.args as { token: string; tokensBurned: bigint; pairAmount: bigint };
           const n = wei(a.tokensBurned);
+          {
+            const pd = pairOf(this.sql.exec("SELECT pair FROM tokens WHERE address = ?", lc(a.token)).toArray()[0]?.pair).decimals;
+            this.sql.exec(
+              "INSERT OR IGNORE INTO fee_events (id, token, kind, who, amount, tokens, ts, block, tx) VALUES (?, ?, 'burn', '', ?, ?, ?, ?, ?)",
+              `${l.transactionHash}:${l.logIndex}`, lc(a.token), Number(a.pairAmount) / 10 ** pd, n, time, block, l.transactionHash,
+            );
+          }
           this.sql.exec("UPDATE tokens SET burned = burned + ?, buyback_burned = buyback_burned + ? WHERE address = ?", n, n, lc(a.token));
         } else if (l.eventName === "MetadataUpdated") {
           const a = l.args as { token: string; metadataURI: string };
@@ -682,6 +700,17 @@ export class Indexer extends DurableObject<Env> {
           priceEth: Number(t.price) * k, pairAmount: t.eth, ts: t.ts, tx: t.tx, block: t.block,
         })),
       });
+    }
+    if (sub === "fees") {
+      const ev = this.sql.exec("SELECT * FROM fee_events WHERE token = ? ORDER BY block DESC LIMIT 100", addr).toArray();
+      const tf = this.sql.exec("SELECT id, trader, is_buy, fee, ts, block, tx FROM trades WHERE token = ? AND fee > 0 ORDER BY block DESC, id DESC LIMIT 100", addr).toArray();
+      const fees = [
+        ...ev.map((e) => ({ id: e.id, kind: e.kind, who: e.who, amount: Number(e.amount), tokens: Number(e.tokens), ts: e.ts, block: Number(e.block), tx: e.tx })),
+        ...tf.map((t) => ({ id: t.id, kind: t.is_buy ? "buy_tax" : "sell_tax", who: t.trader, amount: Number(t.fee), tokens: 0, ts: t.ts, block: Number(t.block), tx: t.tx })),
+      ]
+        .sort((a, b) => b.block - a.block)
+        .slice(0, 100);
+      return json({ fees, pairEth: k });
     }
     if (sub === "holders") {
       const rows = this.sql

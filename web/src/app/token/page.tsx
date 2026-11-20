@@ -6,8 +6,8 @@ import { PriceChart } from "@/components/PriceChart";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { FeesCard } from "@/components/FeesCard";
 import { TradePanel } from "@/components/TradePanel";
-import { useHolders, useToken, useTrades, type Token } from "@/lib/api";
-import { EXPLORER } from "@/lib/config";
+import { useFees, useHolders, useToken, useTrades, type FeeEvent, type Token } from "@/lib/api";
+import { EXPLORER, pairInfo } from "@/lib/config";
 import { fmtCompact, fmtEth, fmtPct, fmtPrice, fmtValue, shortAddr, timeAgo } from "@/lib/format";
 
 function Copy({ value, label }: { value: string; label?: string }) {
@@ -89,79 +89,119 @@ function Stats({ t, ethUsd }: { t: Token; ethUsd: number }) {
   );
 }
 
-function Activity({ t, ethUsd }: { t: Token; ethUsd: number }) {
-  const [tab, setTab] = useState<"trades" | "holders">("trades");
+const FEE_LABEL: Record<FeeEvent["kind"], [string, string]> = {
+  buy_tax: ["Buy tax", "text-up"],
+  sell_tax: ["Sell tax", "text-down"],
+  claim: ["Creator claim", "text-accent"],
+  holders: ["Holder dividends", "text-up"],
+  burn: ["Buyback burn", "text-warn"],
+};
+
+function Activity({ t }: { t: Token; ethUsd: number }) {
+  const [tab, setTab] = useState<"trades" | "holders" | "fees">("trades");
   const trades = useTrades(t.address);
   const holders = useHolders(t.address);
+  const fees = useFees(tab === "fees" ? t.address : undefined);
+  const pair = pairInfo(t.pair);
+  const tx = (h: string, child: React.ReactNode) =>
+    EXPLORER ? <a href={`${EXPLORER}/tx/${h}`} target="_blank" rel="noreferrer" className="hover:text-fg">{child}</a> : child;
+  const th = "py-3 font-normal";
+  const td = "py-3.5";
+  const empty =
+    (tab === "trades" ? trades.data?.trades.length : tab === "holders" ? holders.data?.holders.length : fees.data?.fees.length) === 0;
   return (
-    <div className="rounded-2xl border border-line bg-panel">
-      <div className="flex gap-1 border-b border-line p-1.5">
-        {(["trades", "holders"] as const).map((x) => (
-          <button key={x} onClick={() => setTab(x)} className={`rounded-lg px-3 py-1.5 text-sm capitalize ${tab === x ? "bg-panel-2" : "text-muted hover:text-fg"}`}>
-            {x}
-            {x === "holders" ? ` (${t.holders})` : ""}
+    <div>
+      <div className="flex gap-6 border-b border-line">
+        {([["trades", "Trades"], ["holders", `Holders${t.holders ? ` ${t.holders}` : ""}`], ["fees", "Fee activity"]] as const).map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`-mb-px border-b-2 pb-3 text-base transition-colors ${tab === k ? "border-fg text-fg" : "border-transparent text-muted hover:text-fg"}`}
+          >
+            {label}
           </button>
         ))}
       </div>
-      <div className="max-h-[460px] overflow-auto">
-        {tab === "trades" ? (
-          <table className="w-full font-mono text-xs">
-            <thead className="sticky top-0 bg-panel text-dim">
-              <tr className="text-left">
-                <th className="px-3 py-2 font-normal">Time</th>
-                <th className="px-3 py-2 font-normal">Type</th>
-                <th className="px-3 py-2 text-right font-normal">ETH</th>
-                <th className="hidden px-3 py-2 text-right font-normal sm:table-cell">{t.symbol}</th>
-                <th className="px-3 py-2 text-right font-normal">Trader</th>
+      <div className="max-h-[520px] overflow-auto">
+        {tab === "trades" && (
+          <table className="w-full text-sm tabular-nums">
+            <thead className="sticky top-0 bg-bg text-muted">
+              <tr className="border-b border-line">
+                <th className={`${th} text-left`}>Side</th>
+                <th className={`${th} text-right`}>{t.symbol}</th>
+                <th className={`${th} text-right`}>{pair.symbol}</th>
+                <th className={`${th} hidden text-right sm:table-cell`}>Trader</th>
+                <th className={`${th} text-right`}>When</th>
               </tr>
             </thead>
             <tbody>
               {trades.data?.trades.map((r) => (
-                <tr key={r.id} className="border-t border-line/60">
-                  <td className="px-3 py-2 text-dim">
-                    {EXPLORER ? (
-                      <a href={`${EXPLORER}/tx/${r.tx}`} target="_blank" rel="noreferrer" className="hover:text-fg">{timeAgo(r.ts)}</a>
-                    ) : (
-                      timeAgo(r.ts)
-                    )}
-                  </td>
-                  <td className={`px-3 py-2 ${r.isBuy ? "text-up" : "text-down"}`}>{r.isBuy ? "buy" : "sell"}</td>
-                  <td className="px-3 py-2 text-right">
-                    {fmtEth(r.eth).replace(" ETH", "")}
-                    {ethUsd > 0 && <span className="hidden text-dim sm:inline"> · {fmtValue(r.eth, ethUsd)}</span>}
-                  </td>
-                  <td className="hidden px-3 py-2 text-right sm:table-cell">{fmtCompact(r.tokens)}</td>
-                  <td className="px-3 py-2 text-right">
+                <tr key={r.id} className="border-b border-line/70">
+                  <td className={`${td} ${r.isBuy ? "text-up" : "text-down"}`}>{r.isBuy ? "Buy" : "Sell"}</td>
+                  <td className={`${td} text-right`}>{fmtCompact(r.tokens)}</td>
+                  <td className={`${td} text-right`}>{fmtCompact(Number(r.pairAmount ?? r.eth))}</td>
+                  <td className={`${td} hidden text-right sm:table-cell`}>
                     <Link href={`/portfolio/?w=${r.trader}`} className={`hover:text-accent ${r.trader === t.creator ? "text-warn" : "text-muted"}`}>
                       {r.trader === t.creator ? "dev" : shortAddr(r.trader)}
                     </Link>
                   </td>
+                  <td className={`${td} text-right text-muted`}>{tx(r.tx, timeAgo(r.ts))}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        ) : (
-          <table className="w-full font-mono text-xs">
+        )}
+        {tab === "holders" && (
+          <table className="w-full text-sm tabular-nums">
+            <thead className="sticky top-0 bg-bg text-muted">
+              <tr className="border-b border-line">
+                <th className={`${th} w-10 text-left`}>#</th>
+                <th className={`${th} text-left`}>Holder</th>
+                <th className={`${th} text-right`}>{t.symbol}</th>
+                <th className={`${th} text-right`}>Share</th>
+              </tr>
+            </thead>
             <tbody>
               {holders.data?.holders.map((h, i) => (
-                <tr key={h.holder} className="border-t border-line/60 first:border-0">
-                  <td className="w-8 px-3 py-2 text-dim">{i + 1}</td>
-                  <td className="px-3 py-2">
-                    <Link href={`/portfolio/?w=${h.holder}`} className="hover:text-accent">
-                      {shortAddr(h.holder)}
-                    </Link>
+                <tr key={h.holder} className="border-b border-line/70">
+                  <td className={`${td} text-muted`}>{i + 1}</td>
+                  <td className={td}>
+                    <Link href={`/portfolio/?w=${h.holder}`} className="hover:text-accent">{shortAddr(h.holder)}</Link>
                     {h.label && <span className="ml-2 rounded bg-panel-2 px-1.5 py-0.5 text-[10px] text-muted">{h.label === "pool" ? "v4 pool" : h.label}</span>}
                   </td>
-                  <td className="px-3 py-2 text-right">{fmtCompact(h.amount)}</td>
-                  <td className="w-20 px-3 py-2 text-right text-muted">{fmtPct(h.pct, false)}</td>
+                  <td className={`${td} text-right`}>{fmtCompact(h.amount)}</td>
+                  <td className={`${td} text-right text-muted`}>{fmtPct(h.pct, false)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-        {(tab === "trades" ? trades.data?.trades.length : holders.data?.holders.length) === 0 && (
-          <p className="py-10 text-center text-xs text-dim">Nothing yet</p>
+        {tab === "fees" && (
+          <table className="w-full text-sm tabular-nums">
+            <thead className="sticky top-0 bg-bg text-muted">
+              <tr className="border-b border-line">
+                <th className={`${th} text-left`}>Type</th>
+                <th className={`${th} text-right`}>{pair.symbol}</th>
+                <th className={`${th} hidden text-right sm:table-cell`}>Wallet</th>
+                <th className={`${th} text-right`}>When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fees.data?.fees.map((f) => (
+                <tr key={f.id + f.kind} className="border-b border-line/70">
+                  <td className={`${td} ${FEE_LABEL[f.kind][1]}`}>
+                    {FEE_LABEL[f.kind][0]}
+                    {f.kind === "burn" && f.tokens > 0 && <span className="ml-1.5 text-xs text-muted">{fmtCompact(f.tokens)} {t.symbol}</span>}
+                  </td>
+                  <td className={`${td} text-right`}>{fmtCompact(f.amount)}</td>
+                  <td className={`${td} hidden text-right text-muted sm:table-cell`}>{f.who ? shortAddr(f.who) : "—"}</td>
+                  <td className={`${td} text-right text-muted`}>{tx(f.tx, timeAgo(f.ts))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
+        {empty && <p className="py-10 text-center text-sm text-dim">Nothing yet</p>}
       </div>
     </div>
   );
