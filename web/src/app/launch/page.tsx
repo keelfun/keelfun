@@ -306,7 +306,7 @@ export default function LaunchPage() {
                     className={`mt-2 h-12 w-full rounded-2xl border bg-panel px-4 text-sm outline-none ${pairIdx >= 3 ? "border-accent" : "border-line text-muted"}`}
                   >
                     <option value="" disabled>
-                      Or pair with a tokenized stock ({PAIRS.length - 3})
+                      Or pair with a tokenized stock or crypto ({PAIRS.length - 3})
                     </option>
                     {PAIRS.slice(3).map((pr, i) => (
                       <option key={pr.address} value={i + 3}>
