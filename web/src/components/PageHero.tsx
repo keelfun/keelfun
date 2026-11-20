@@ -14,7 +14,7 @@ export function PageHero({ title, sub, children }: { title: React.ReactNode; sub
 }
 
 export function Em({ children }: { children: React.ReactNode }) {
-  return <em className="text-[#bcd3ff]">{children}</em>;
+  return <em className="text-accent-soft">{children}</em>;
 }
 
 export function Num({ n, children }: { n: number; children: React.ReactNode }) {

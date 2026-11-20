@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@theme inline {
+@theme {
   --color-bg: #05070d;
   --color-panel: #0b0f1a;
   --color-panel-2: #111727;
@@ -14,6 +14,11 @@
   --color-up: #2ee6a6;
   --color-down: #ff5c7a;
   --color-warn: #ffb020;
+  --color-accent-2: #7fd4ff;
+  --color-accent-soft: #bcd3ff;
+}
+
+@theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-serif: var(--font-serif-face), Georgia, serif;
@@ -27,8 +32,8 @@ body {
 
 body {
   background-image:
-    radial-gradient(48rem 32rem at 85% -10rem, rgb(61 123 255 / 0.07), transparent 70%),
-    radial-gradient(36rem 30rem at 50% 115%, rgb(61 123 255 / 0.04), transparent 70%);
+    radial-gradient(48rem 32rem at 85% -10rem, color-mix(in srgb, var(--color-accent) 7%, transparent), transparent 70%),
+    radial-gradient(36rem 30rem at 50% 115%, color-mix(in srgb, var(--color-accent) 4%, transparent), transparent 70%);
   background-attachment: fixed;
 }
 
@@ -59,7 +64,7 @@ input[type="number"] {
 
 .grid-glow {
   background-image:
-    radial-gradient(56rem 22rem at 30% -6rem, rgb(61 123 255 / 0.10), transparent 70%),
+    radial-gradient(56rem 22rem at 30% -6rem, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent 70%),
     linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
     linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
   background-size: auto, 40px 40px, 40px 40px;
@@ -67,7 +72,7 @@ input[type="number"] {
 }
 
 .text-gradient {
-  background: linear-gradient(90deg, #3d7bff, #7fd4ff);
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-2));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -112,7 +117,7 @@ input[type="number"] {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(28rem 12rem at var(--mx, 50%) -4rem, rgb(61 123 255 / 0.16), transparent 70%);
+  background: radial-gradient(28rem 12rem at var(--mx, 50%) -4rem, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 70%);
   opacity: 0;
   transition: opacity 0.3s;
   pointer-events: none;
@@ -121,4 +126,60 @@ input[type="number"] {
 
 @media (prefers-reduced-motion: reduce) {
   .anim-chart-line, .anim-chart-draw, .anim-float, .anim-marquee, .anim-ping, .anim-flash, .anim-rise { animation: none !important; }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #0a0a0b;
+  --color-panel: #111113;
+  --color-panel-2: #18181b;
+  --color-line: #232327;
+  --color-line-2: #2e2e33;
+  --color-accent: #7cb7ff;
+  --color-accent-2: #a9d4ff;
+  --color-accent-soft: #cfe4ff;
+  --color-accent-ink: #06121f;
+}
+:root[data-theme="dusk"] {
+  --color-bg: #070818;
+  --color-panel: #0d0f24;
+  --color-panel-2: #14173a;
+  --color-line: #1f2350;
+  --color-line-2: #2a2f66;
+  --color-accent: #5b6cff;
+  --color-accent-2: #8f9bff;
+  --color-accent-soft: #c5ccff;
+  --color-accent-ink: #ffffff;
+}
+:root[data-theme="astro"] {
+  --color-bg: #0a0716;
+  --color-panel: #120d24;
+  --color-panel-2: #1a1433;
+  --color-line: #261d48;
+  --color-line-2: #32275c;
+  --color-accent: #8b5cf6;
+  --color-accent-2: #c4a5ff;
+  --color-accent-soft: #ddd0ff;
+  --color-accent-ink: #ffffff;
+}
+:root[data-theme="neo"] {
+  --color-bg: #050a08;
+  --color-panel: #0a1410;
+  --color-panel-2: #101d17;
+  --color-line: #18291f;
+  --color-line-2: #22382b;
+  --color-accent: #34d399;
+  --color-accent-2: #8af0c4;
+  --color-accent-soft: #c4f5df;
+  --color-accent-ink: #04140c;
+}
+:root[data-theme="crimson"] {
+  --color-bg: #0a0606;
+  --color-panel: #140c0c;
+  --color-panel-2: #1d1212;
+  --color-line: #2b1a1a;
+  --color-line-2: #3a2323;
+  --color-accent: #ef4444;
+  --color-accent-2: #ff8a7a;
+  --color-accent-soft: #ffc9c2;
+  --color-accent-ink: #ffffff;
 }

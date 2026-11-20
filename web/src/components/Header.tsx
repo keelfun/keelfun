@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BRAND, chain } from "@/lib/config";
 import { ConnectButton } from "./ConnectButton";
+import { LangButton, ThemeButton } from "./Prefs";
 
 const NAV = [
   { href: "/", label: "Discover" },
@@ -21,7 +22,7 @@ const NAV = [
 export function Logo({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
-      <rect width="32" height="32" rx="9" fill="#3d7bff" />
+      <rect width="32" height="32" rx="9" className="fill-accent" />
       <path fill="#fff" d="M16.6 5.5v10.3h8.2z" />
       <path fill="#fff" fillOpacity=".55" d="M15 8.5v7.3H9.4z" />
       <path fill="#fff" d="M5.5 18h21l-3.6 4.6H9.1z" />
@@ -62,6 +63,8 @@ export function Header() {
           >
             + Launch
           </Link>
+          <LangButton />
+          <ThemeButton />
           <ConnectButton />
         </div>
       </div>

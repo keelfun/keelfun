@@ -380,7 +380,7 @@ export default function LaunchPage() {
                       <span className="text-sm font-medium">{label}</span>
                       <span className="font-mono text-lg">{v / 100}%</span>
                     </div>
-                    <input type="range" min={100} max={1000} step={50} value={v} onChange={(e) => set(Number(e.target.value))} className="mt-3 w-full accent-[#3d7bff]" />
+                    <input type="range" min={100} max={1000} step={50} value={v} onChange={(e) => set(Number(e.target.value))} className="mt-3 w-full accent-accent" />
                     <div className="mt-1 flex justify-between text-[11px] text-dim">
                       <span>1%</span>
                       <span>protocol {platformBpsFor(v) / 100}% included</span>
@@ -420,7 +420,7 @@ export default function LaunchPage() {
                           <span className="absolute top-2.5 right-3 text-xs text-dim">%</span>
                         </div>
                       </div>
-                      <input type="range" min={0} max={100} step={5} value={alloc[k]} onChange={(e) => setShare(k, Number(e.target.value))} className="mt-3 w-full accent-[#3d7bff]" />
+                      <input type="range" min={0} max={100} step={5} value={alloc[k]} onChange={(e) => setShare(k, Number(e.target.value))} className="mt-3 w-full accent-accent" />
                     </div>
                   ))}
                 </div>
@@ -562,7 +562,7 @@ export default function LaunchPage() {
                 </div>
               ))}
             </dl>
-            <button type="submit" disabled={!valid || !!step || !DEPLOYED} className="mt-5 h-14 w-full rounded-full bg-[#7fd4ff] text-base font-semibold text-[#05070d] transition-opacity hover:opacity-90 disabled:opacity-40">
+            <button type="submit" disabled={!valid || !!step || !DEPLOYED} className="mt-5 h-14 w-full rounded-full bg-accent-2 text-base font-semibold text-bg transition-opacity hover:opacity-90 disabled:opacity-40">
               {!DEPLOYED ? "Contracts not deployed yet" : step ?? (address ? "Launch token" : "Connect wallet")}
             </button>
             <p className="mt-3 text-center text-xs text-dim">You&apos;ll confirm the transaction in your wallet. Nothing is minted until you submit.</p>

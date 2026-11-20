@@ -14,8 +14,8 @@ export function HeroChart({ featured, ethUsd }: { featured?: Token; ethUsd: numb
       <svg viewBox="0 0 960 300" preserveAspectRatio="none" className="anim-chart-draw absolute inset-0 h-full w-full">
         <defs>
           <linearGradient id="hc-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3d7bff" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="#3d7bff" stopOpacity="0" />
+            <stop offset="0%" style={{ stopColor: "var(--color-accent)" }} stopOpacity="0.28" />
+            <stop offset="100%" style={{ stopColor: "var(--color-accent)" }} stopOpacity="0" />
           </linearGradient>
           <linearGradient id="hc-fade" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%" stopColor="white" stopOpacity="0" />
@@ -27,7 +27,7 @@ export function HeroChart({ featured, ethUsd }: { featured?: Token; ethUsd: numb
         </defs>
         <g mask="url(#hc-mask)">
           <path d={`${LINE} L960 300 L0 300 Z`} fill="url(#hc-fill)" />
-          <path d={LINE} fill="none" stroke="#bcd3ff" strokeOpacity="0.85" strokeWidth="2.5" vectorEffect="non-scaling-stroke" className="anim-chart-line" />
+          <path d={LINE} fill="none" style={{ stroke: "var(--color-accent-soft)" }} strokeOpacity="0.85" strokeWidth="2.5" vectorEffect="non-scaling-stroke" className="anim-chart-line" />
         </g>
       </svg>
       <span className="absolute right-[12.5%] top-[25%] block h-3 w-3">

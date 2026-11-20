@@ -41,7 +41,7 @@ export default function Home() {
         <HeroChart featured={data?.tokens[0]} ethUsd={ethUsd} />
         <div className="anim-rise relative mx-auto max-w-7xl px-4 pb-10 pt-16 sm:px-6 sm:pb-14 sm:pt-28">
           <h1 className="max-w-3xl font-serif text-[44px] leading-[1.02] tracking-tight sm:text-7xl">
-            The steady way to <em className="text-[#bcd3ff]">launch</em> on Base
+            The steady way to <em className="text-accent-soft">launch</em> on Base
           </h1>
           <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-fg/80 sm:text-base">
             One transaction, a Uniswap v4 pool from block one and liquidity locked forever. Fees go to you, your holders or a
@@ -205,7 +205,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-gradient-to-r from-bg/85 via-bg/30 to-transparent" />
         <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32">
           <h2 className="max-w-xl font-serif text-4xl leading-tight sm:text-6xl">
-            Every token gets a <em className="text-[#bcd3ff]">keel</em>
+            Every token gets a <em className="text-accent-soft">keel</em>
           </h2>
           <p className="mt-4 max-w-md text-[15px] leading-relaxed text-fg/80">
             Fixed supply, 100% of tokens in the pool, optional 60-second anti-snipe and fees that keep paying the people who
