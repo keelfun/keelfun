@@ -9,6 +9,7 @@ import { launchFactoryAbi } from "@/lib/abis";
 import { api, saveMetadata, uploadImage, type Stats } from "@/lib/api";
 import { ADDR, chain, DEPLOYED, launchCap, PAIRS, platformBpsFor, SUPPLY_TIERS } from "@/lib/config";
 import { fmtEth, fmtPrice, fmtUsd } from "@/lib/format";
+import { PairLogo, PairPicker, shortName } from "@/components/PairPicker";
 import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
 
 const input =
@@ -97,6 +98,7 @@ export default function LaunchPage() {
   const [discord, setDiscord] = useState("");
   const [tier, setTier] = useState(0);
   const [pairIdx, setPairIdx] = useState(0);
+  const [picker, setPicker] = useState(false);
   const [buyBps, setBuyBps] = useState(300);
   const [sellBps, setSellBps] = useState(300);
   const [alloc, setAlloc] = useState({ creator: 100, holders: 0, burn: 0 });
@@ -297,23 +299,33 @@ export default function LaunchPage() {
                       </button>
                     ))}
                   </div>
-                  <select
-                    value={pairIdx >= 3 ? String(pairIdx) : ""}
-                    onChange={(e) => {
-                      setPairIdx(Number(e.target.value));
-                      setBuy("");
-                    }}
-                    className={`mt-2 h-12 w-full rounded-2xl border bg-panel px-4 text-sm outline-none ${pairIdx >= 3 ? "border-accent" : "border-line text-muted"}`}
+                  <button
+                    type="button"
+                    onClick={() => setPicker(true)}
+                    className={`mt-2 flex h-12 w-full items-center gap-3 rounded-2xl border bg-panel px-4 text-left text-sm transition-colors ${pairIdx >= 3 ? "border-accent bg-accent/10" : "border-line text-muted hover:border-line-2"}`}
                   >
-                    <option value="" disabled>
-                      Or pair with a stock, crypto or Base meme ({PAIRS.length - 3})
-                    </option>
-                    {PAIRS.slice(3).map((pr, i) => (
-                      <option key={pr.address} value={i + 3}>
-                        {pr.symbol} · {pr.name}
-                      </option>
-                    ))}
-                  </select>
+                    {pairIdx >= 3 ? (
+                      <>
+                        <PairLogo p={pair} size={22} />
+                        <span className="font-medium text-fg">{pair.symbol}</span>
+                        <span className="min-w-0 truncate text-dim">{shortName(pair)}</span>
+                      </>
+                    ) : (
+                      <span className="min-w-0 truncate">Stocks, crypto &amp; Base memes ({PAIRS.length - 3})</span>
+                    )}
+                    <span className="ml-auto shrink-0 text-dim">▾</span>
+                  </button>
+                  {picker && (
+                    <PairPicker
+                      pairs={PAIRS.slice(3).map((p, k) => ({ p, i: k + 3 }))}
+                      onClose={() => setPicker(false)}
+                      onPick={(i) => {
+                        setPairIdx(i);
+                        setBuy("");
+                        setPicker(false);
+                      }}
+                    />
+                  )}
                 </Field>
                 <details className="group rounded-2xl border border-line bg-panel" open>
                   <summary className="flex h-12 cursor-pointer list-none items-center gap-2 px-4 text-sm font-medium">
