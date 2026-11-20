@@ -86,4 +86,4 @@ export function snipeBpsAt(launchedAt: number, now: number) {
   const dt = now - launchedAt;
   return dt >= SNIPE.seconds || dt < 0 ? 0 : Math.round((SNIPE.startBps * (SNIPE.seconds - dt)) / SNIPE.seconds);
 }
-export const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID || "";
+export const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID || process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "";

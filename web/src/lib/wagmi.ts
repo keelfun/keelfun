@@ -1,6 +1,7 @@
 import { createConfig, fallback, http, type CreateConnectorFn, type Transport } from "wagmi";
 import { injected } from "@wagmi/core";
 import { walletConnect } from "@wagmi/connectors/walletConnect";
+import { coinbaseWallet } from "@wagmi/connectors/coinbaseWallet";
 import { arbitrum, linea, mainnet, optimism } from "viem/chains";
 import { BRAND, chain, RPC_URL, WC_PROJECT_ID } from "./config";
 
@@ -8,7 +9,10 @@ const BASE_RPCS = ["https://base-rpc.publicnode.com", "https://base.drpc.org", "
 
 export const BRIDGE_CHAINS = [mainnet, arbitrum, optimism, linea] as const;
 
-const connectors: CreateConnectorFn[] = [injected()];
+const connectors: CreateConnectorFn[] = [
+  injected(),
+  coinbaseWallet({ appName: BRAND, appLogoUrl: "https://keelfun.app/icon.png", preference: { options: "all" } }),
+];
 if (WC_PROJECT_ID) {
   connectors.push(
     walletConnect({

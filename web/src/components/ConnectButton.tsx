@@ -29,7 +29,8 @@ export function ConnectButton() {
       setOpen(false);
       connect({ connector: connectors[i], chainId: chain.id });
     };
-    const labels: Record<string, string> = { injected: "Browser wallet", walletConnect: "WalletConnect" };
+    const labels: Record<string, string> = { injected: "Browser wallet", walletConnect: "WalletConnect", coinbaseWallet: "Coinbase / Base wallet" };
+    const subs: Record<string, string> = { injected: "MetaMask, Rabby, in-app browsers", walletConnect: "Any mobile wallet app or QR", coinbaseWallet: "Smart wallet with passkey, no extension" };
     return (
       <div className="relative" ref={ref}>
         <button
@@ -40,7 +41,7 @@ export function ConnectButton() {
           {isPending ? "Connecting…" : "Connect"}
         </button>
         {open && (
-          <div className="absolute right-0 top-11 z-50 w-56 rounded-xl border border-line bg-panel p-1 shadow-2xl">
+          <div className="absolute right-0 top-11 z-50 w-64 rounded-xl border border-line bg-panel p-1 shadow-2xl">
             {connectors.map((c, i) => (
               <button
                 key={c.uid}
@@ -49,7 +50,7 @@ export function ConnectButton() {
               >
                 <span className="text-sm">{labels[c.type] ?? c.name}</span>
                 <span className="text-xs text-muted">
-                  {c.type === "walletConnect" ? "Any mobile wallet app or QR" : "MetaMask, Rabby, in-app browsers"}
+                  {subs[c.type] ?? "Detected in your browser"}
                 </span>
               </button>
             ))}

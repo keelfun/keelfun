@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 
 // @wagmi/connectors only exports its barrel, which pulls optional SDKs we don't install.
 const wcConnector = path.resolve(__dirname, "node_modules/@wagmi/connectors/dist/esm/walletConnect.js");
+const cbConnector = path.resolve(__dirname, "node_modules/@wagmi/connectors/dist/esm/coinbaseWallet.js");
 
 const nextConfig: NextConfig = {
   output: "export",
@@ -13,6 +14,7 @@ const nextConfig: NextConfig = {
   eslint: { ignoreDuringBuilds: true },
   webpack: (config) => {
     config.resolve.alias["@wagmi/connectors/walletConnect$"] = wcConnector;
+    config.resolve.alias["@wagmi/connectors/coinbaseWallet$"] = cbConnector;
     config.externals.push("pino-pretty", "lokijs", "encoding");
     return config;
   },

@@ -20,7 +20,8 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@wagmi/connectors/walletConnect": ["./node_modules/@wagmi/connectors/dist/types/walletConnect.d.ts"]
+      "@wagmi/connectors/walletConnect": ["./node_modules/@wagmi/connectors/dist/types/walletConnect.d.ts"],
+      "@wagmi/connectors/coinbaseWallet": ["./node_modules/@wagmi/connectors/dist/types/coinbaseWallet.d.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
