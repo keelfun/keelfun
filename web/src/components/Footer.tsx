@@ -23,11 +23,6 @@ export function Footer() {
           </p>
           <div className="mt-4 flex items-center gap-2">
             <Socials />
-            {SOCIALS.x && (
-              <a href={SOCIALS.x} target="_blank" rel="noreferrer" className="text-sm text-muted hover:text-fg">
-                @{SOCIALS.x.split("/").pop()}
-              </a>
-            )}
           </div>
         </div>
         {COLS.map(([title, links]) => (
