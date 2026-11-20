@@ -35,7 +35,7 @@ export const EXPLORER = (process.env.NEXT_PUBLIC_EXPLORER || chain.blockExplorer
 export const BRAND = process.env.NEXT_PUBLIC_BRAND || "Keel";
 export const SOCIALS = {
   x: process.env.NEXT_PUBLIC_X_URL || "https://x.com/Keelfunxyz",
-  github: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/keelfun/keel",
+  github: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/keelfun/keelfun",
 };
 
 const zero = "0x0000000000000000000000000000000000000000";
