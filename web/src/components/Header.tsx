@@ -1,24 +1,57 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { BRAND, chain } from "@/lib/config";
 import { ConnectButton } from "./ConnectButton";
 import { LangButton, ThemeButton } from "./Prefs";
+import { SearchK } from "./SearchK";
 
-const NAV = [
+const PRIMARY = [
   { href: "/", label: "Discover" },
   { href: "/terminal/", label: "Terminal" },
+  { href: "/trending/", label: "Trending" },
+  { href: "/traders/", label: "Traders" },
+  { href: "/chain/", label: "Chain" },
   { href: "/launch/", label: "Launch" },
   { href: "/swap/", label: "Swap" },
   { href: "/portfolio/", label: "Portfolio" },
+  { href: "/bridge/", label: "Bridge" },
+];
+const MORE = [
   { href: "/buyback/", label: "Buyback" },
   { href: "/flywheel/", label: "Flywheel" },
   { href: "/revenue/", label: "Revenue" },
-  { href: "/bridge/", label: "Bridge" },
   { href: "/builders/", label: "Builders" },
   { href: "/docs/", label: "Docs" },
   { href: "/api/", label: "API" },
 ];
+const NAV = [...PRIMARY, ...MORE];
+
+function MoreMenu({ active }: { active: (h: string) => boolean }) {
+  const [open, setOpen] = useState(false);
+  const path = usePathname();
+  useEffect(() => setOpen(false), [path]);
+  const on = MORE.some((m) => active(m.href));
+  return (
+    <div className="relative" onMouseLeave={() => setOpen(false)}>
+      <button onClick={() => setOpen((v) => !v)} onMouseEnter={() => setOpen(true)} className={`flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm xl:px-2.5 ${on ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}>
+        More <span className="text-[10px]">▾</span>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 pt-1">
+          <div className="w-44 rounded-xl border border-line bg-panel p-1 shadow-2xl">
+            {MORE.map((m) => (
+              <Link key={m.href} href={m.href} className={`block rounded-lg px-3 py-2 text-sm ${active(m.href) ? "bg-panel-2 text-fg" : "text-muted hover:bg-panel-2 hover:text-fg"}`}>
+                {m.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Logo({ className = "" }: { className?: string }) {
   return (
@@ -43,7 +76,7 @@ export function Header() {
           <span className="text-[15px] font-semibold tracking-tight">{BRAND}</span>
         </Link>
         <nav className="hidden items-center gap-0.5 lg:flex">
-          {NAV.map((n) => (
+          {PRIMARY.map((n) => (
             <Link
               key={n.href}
               href={n.href}
@@ -52,6 +85,7 @@ export function Header() {
               {n.label}
             </Link>
           ))}
+          <MoreMenu active={active} />
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 font-mono text-[11px] text-muted xl:flex">
@@ -64,6 +98,7 @@ export function Header() {
           >
             + Launch
           </Link>
+          <SearchK />
           <LangButton />
           <ThemeButton />
           <ConnectButton />

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { StatusBar } from "@/components/StatusBar";
 import { BRAND } from "@/lib/config";
 import { THEME_BOOT } from "@/lib/theme";
 import { Providers } from "./providers";
@@ -27,11 +28,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${serif.variable} flex min-h-dvh flex-col overflow-x-clip antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${serif.variable} flex min-h-dvh flex-col overflow-x-clip antialiased lg:pb-8`}>
         <Providers>
           <Header />
           <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-20 sm:px-6">{children}</main>
           <Footer />
+          <StatusBar />
         </Providers>
       </body>
     </html>

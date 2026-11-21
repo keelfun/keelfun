@@ -1,18 +1,14 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { parseEther } from "viem";
-import { usePublicClient, useWriteContract } from "wagmi";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { useSendTransaction } from "wagmi";
-import { ETH, getQuote } from "@/components/AnySwap";
-import { fetchBasePools, type BasePool } from "@/lib/basePools";
+import { Bolt, PresetBar, useKeelBuy, usePrefs, useRelayBuy } from "@/components/QuickBuy";
 import { TokenAvatar } from "@/components/TokenAvatar";
-import { launchRouterAbi } from "@/lib/abis";
 import { api, useTokens, type Portfolio, type Token } from "@/lib/api";
-import { ADDR, chain, pairInfo } from "@/lib/config";
+import { fetchBasePools, type BasePool } from "@/lib/basePools";
+import { pairInfo } from "@/lib/config";
 import { fmtCompact, fmtPct, fmtPrice, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
-import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
+import { errMsg } from "@/lib/tx";
 
 const COLS = [
   { sort: "new", title: "New Pairs" },
@@ -31,31 +27,6 @@ const DEX: Record<string, string> = {
   "uniswap-v4-base": "Uni v4", "uniswap-v3-base": "Uni v3", "uniswap-v2-base": "Uni v2", "aerodrome-base": "Aero", "aerodrome-slipstream": "Aero CL",
   "aero-slipstream-base": "Aero CL", "pancakeswap-v3-base": "Pancake", "sushiswap-v3-base": "Sushi", "baseswap": "BaseSwap",
 };
-
-function Bolt({ className = "h-3.5 w-3.5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor"><path d="M13 2 4 14h6l-1 8 9-12h-6z" /></svg>
-  );
-}
-
-function useQuickBuy() {
-  const client = usePublicClient({ chainId: chain.id });
-  const ensureWallet = useEnsureWallet();
-  const confirm = useConfirm();
-  const { writeContractAsync } = useWriteContract();
-  return async (t: Token, amount: string) => {
-    const account = await ensureWallet();
-    const value = parseEther(amount || "0");
-    if (value === 0n) throw new Error("Set a quick buy amount");
-    const { result } = await client!.simulateContract({ address: ADDR.router, abi: launchRouterAbi, functionName: "quoteBuy", args: [t.address, value] });
-    const minOut = (result[1] * 85n) / 100n;
-    const hash = await writeContractAsync({
-      address: ADDR.router, abi: launchRouterAbi, functionName: "buy",
-      args: [t.address, value, minOut, account, BigInt(Math.floor(Date.now() / 1000) + 600)], value, chainId: chain.id,
-    });
-    await confirm(hash);
-  };
-}
 
 function Row({ t, ethUsd, amount, buy }: { t: Token; ethUsd: number; amount: string; buy: (t: Token, a: string) => Promise<void> }) {
   const pair = pairInfo(t.pair);
@@ -166,25 +137,6 @@ function Column({ sort, title, amount, buy, hidden }: { sort: string; title: str
 }
 
 
-function useRelayBuy() {
-  const ensureWallet = useEnsureWallet();
-  const confirm = useConfirm();
-  const { sendTransactionAsync } = useSendTransaction();
-  return async (p: BasePool, amount: string) => {
-    const user = await ensureWallet();
-    const wei = parseEther(amount || "0");
-    if (wei === 0n) throw new Error("Set a quick buy amount");
-    const q = await getQuote(user, ETH, { address: p.token.address, symbol: p.token.symbol, name: p.token.name, decimals: p.token.decimals }, wei.toString());
-    for (const s of q.steps) {
-      if (s.kind !== "transaction") continue;
-      for (const it of s.items) {
-        const h = await sendTransactionAsync({ to: it.data.to, data: it.data.data, value: BigInt(it.data.value || "0"), chainId: chain.id });
-        await confirm(h);
-      }
-    }
-  };
-}
-
 const pctChip = (v: number, label: string) => (
   <span className={`inline-flex h-[18px] items-center gap-0.5 rounded border px-1 font-mono text-[10px] ${v > 0 ? "border-up/40 text-up" : v < 0 ? "border-down/40 text-down" : "border-line text-muted"}`}>
     <span className="text-dim">{label}</span>
@@ -210,7 +162,7 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
   };
   const t = p.token;
   return (
-    <Link href={`/swap/?buy=${t.address}`} className="group block border-b border-line px-3 py-2.5 transition-colors hover:bg-panel-2/60">
+    <Link href={`/pair/?p=${p.pool}`} className="group block border-b border-line px-3 py-2.5 transition-colors hover:bg-panel-2/60">
       <div className="flex gap-3">
         <div className="relative shrink-0">
           <TokenAvatar src={t.image} symbol={t.symbol} size={52} />
@@ -385,17 +337,16 @@ function Tracker({ onClose }: { onClose: () => void }) {
 }
 
 export default function TerminalPage() {
-  const [amount, setAmount] = useState("0.001");
   const [tab, setTab] = useState(0);
   const [tracker, setTracker] = useState(true);
   const [src, setSrc] = useState<"base" | "keel">("base");
-  const buy = useQuickBuy();
-  const relayBuy = useRelayBuy();
+  const { preset } = usePrefs();
+  const amount = preset.amount;
+  const keelBuy = useKeelBuy();
+  const relay = useRelayBuy();
+  const buy = (t: Token, a: string) => keelBuy(t, { ...preset, amount: a });
+  const relayBuy = (p: BasePool, a: string) => relay(p, { ...preset, amount: a });
   const cols = src === "base" ? BASE_COLS : COLS;
-  useEffect(() => {
-    const a = localStorage.getItem("keel-quickbuy");
-    if (a) setAmount(a);
-  }, []);
   return (
     <div className="relative left-1/2 -mb-20 flex h-[calc(100dvh-6.5rem)] w-screen -translate-x-1/2 flex-col border-t border-line lg:h-[calc(100dvh-3.5rem)]">
       <div className="flex items-center gap-3 border-b border-line px-3 py-2">
@@ -410,21 +361,7 @@ export default function TerminalPage() {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden text-xs text-muted sm:inline">Quick buy</span>
-          <label className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-bg px-2 focus-within:border-accent">
-            <Bolt className="h-3.5 w-3.5 text-up" />
-            <input
-              value={amount}
-              onChange={(e) => {
-                const v = e.target.value.replace(/[^0-9.]/g, "");
-                setAmount(v);
-                localStorage.setItem("keel-quickbuy", v);
-              }}
-              inputMode="decimal"
-              className="w-16 bg-transparent font-mono text-xs outline-none"
-            />
-            <span className="font-mono text-[11px] text-dim">ETH</span>
-          </label>
+          <PresetBar />
         </div>
       </div>
       <div className="flex border-b border-line lg:hidden">

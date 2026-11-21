@@ -546,6 +546,8 @@ export class Indexer extends DurableObject<Env> {
           return this.tokenRoute(lc(parts[1]), parts[2], url.searchParams);
         case "portfolio":
           return json(this.portfolio(lc(parts[1] ?? "")));
+        case "traders":
+          return json(this.traders(url.searchParams));
         case "builders":
           return json(this.builders());
         case "revenue":
@@ -850,6 +852,65 @@ export class Indexer extends DurableObject<Env> {
       prev = p;
     }
     return out.map((c) => ({ ...c, open: c.open * k, high: c.high * k, low: c.low * k, close: c.close * k, volume: c.volume * k }));
+  }
+
+  private traders(q: URLSearchParams) {
+    const win: Record<string, number> = { "1d": 86_400, "7d": 604_800, "30d": 2_592_000 };
+    const span = win[q.get("window") ?? "7d"] ?? 0;
+    const since = span ? Math.floor(Date.now() / 1000) - span : 0;
+    const rows = this.sql
+      .exec(
+        `SELECT tr.trader, tr.token, tr.is_buy, tr.eth, tr.tokens, tr.ts, t.pair, t.symbol, t.image, t.price, t.creator
+         FROM trades tr JOIN tokens t ON t.address = tr.token WHERE tr.ts >= ?`,
+        since,
+      )
+      .toArray();
+    type Pos = { buyEth: number; sellEth: number; buyTok: number; sellTok: number; symbol: string; image: string | null; price: number };
+    const by = new Map<string, { pos: Map<string, Pos>; buys: number; sells: number; last: number; dev: boolean }>();
+    const devs = new Set(this.sql.exec("SELECT DISTINCT creator FROM tokens").toArray().map((r) => String(r.creator)));
+    for (const r of rows) {
+      const k = this.pairEth(r.pair);
+      const w = String(r.trader);
+      let a = by.get(w);
+      if (!a) by.set(w, (a = { pos: new Map(), buys: 0, sells: 0, last: 0, dev: devs.has(w) }));
+      let p = a.pos.get(String(r.token));
+      if (!p) a.pos.set(String(r.token), (p = { buyEth: 0, sellEth: 0, buyTok: 0, sellTok: 0, symbol: String(r.symbol), image: (r.image as string) ?? null, price: Number(r.price ?? 0) * k }));
+      const eth = Number(r.eth) * k;
+      if (r.is_buy) {
+        p.buyEth += eth;
+        p.buyTok += Number(r.tokens);
+        a.buys++;
+      } else {
+        p.sellEth += eth;
+        p.sellTok += Number(r.tokens);
+        a.sells++;
+      }
+      a.last = Math.max(a.last, Number(r.ts));
+    }
+    const out = [...by.entries()].map(([wallet, a]) => {
+      let realized = 0, unrealized = 0, cost = 0, volume = 0, wins = 0, losses = 0, open = 0;
+      let best: { symbol: string; image: string | null; pnl: number } | null = null;
+      for (const p of a.pos.values()) {
+        const avg = p.buyTok > 0 ? p.buyEth / p.buyTok : 0;
+        const sold = Math.min(p.sellTok, p.buyTok);
+        const held = Math.max(0, p.buyTok - p.sellTok);
+        const r = p.sellEth - (p.buyTok > 0 ? avg * sold : 0) - (p.buyTok > 0 ? 0 : 0);
+        const u = held * p.price - avg * held;
+        const pnl = (p.buyTok > 0 ? r : 0) + u;
+        realized += p.buyTok > 0 ? r : 0;
+        unrealized += u;
+        cost += p.buyEth;
+        volume += p.buyEth + p.sellEth;
+        if (held > 0 && held * p.price > 1e-7) open++;
+        if (pnl > 0) wins++;
+        else if (pnl < 0) losses++;
+        if (!best || pnl > best.pnl) best = { symbol: p.symbol, image: p.image, pnl };
+      }
+      const pnl = realized + unrealized;
+      return { wallet, pnlEth: pnl, pnlPct: cost > 0 ? pnl / cost : 0, unrealizedEth: unrealized, open, volumeEth: volume, wins, losses, buys: a.buys, sells: a.sells, best, lastTs: a.last, dev: a.dev };
+    });
+    out.sort((x, y) => y.pnlEth - x.pnlEth);
+    return { traders: out.slice(0, 100), ethUsd: this.ethUsd() };
   }
 
   private portfolio(wallet: string) {
