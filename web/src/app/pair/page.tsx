@@ -7,7 +7,7 @@ import { CandlestickSeries, ColorType, createChart, HistogramSeries, type IChart
 import { AnySwap } from "@/components/AnySwap";
 import { Bolt, PresetBar, usePrefs, useRelayBuy } from "@/components/QuickBuy";
 import { TokenAvatar } from "@/components/TokenAvatar";
-import { api } from "@/lib/api";
+import { api, type Token } from "@/lib/api";
 import { DEX_LABEL, fetchOhlcv, fetchPool, fetchPoolTrades, fetchTokenTopPool, type PoolDetail } from "@/lib/basePools";
 import { EXPLORER } from "@/lib/config";
 import { fmtCompact, fmtPrice, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
@@ -111,7 +111,11 @@ function PairView() {
   const resolved = useQuery({ queryKey: ["toppool", tokenParam], queryFn: () => fetchTokenTopPool(tokenParam), enabled: !poolParam && !!tokenParam });
   const pool = poolParam || resolved.data || "";
   const { data: p, error } = useQuery({ queryKey: ["pool", pool], queryFn: () => fetchPool(pool), enabled: !!pool, refetchInterval: 30000, retry: 2 });
-  const keel = useQuery({ queryKey: ["is-keel", p?.token.address], queryFn: () => api(`/tokens/${p!.token.address}`), enabled: !!p, retry: false });
+  const keel = useQuery({ queryKey: ["is-keel", p?.token.address], queryFn: async () => {
+      const a = p!.token.address.toLowerCase();
+      const r = await api<{ tokens: Token[] }>(`/tokens?q=${a}&limit=5`);
+      return r.tokens.some((t) => t.address.toLowerCase() === a) || null;
+    }, enabled: !!p, retry: false });
   useEffect(() => {
     if (keel.data && p) router.replace(`/token/?a=${p.token.address}`);
   }, [keel.data, p, router]);

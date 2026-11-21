@@ -15,10 +15,32 @@ const PATHS: Record<string, string> = {
 type GtPool = { attributes: Record<string, any>; relationships: Record<string, { data?: { id: string } }> };
 const num = (v: unknown) => (v == null ? 0 : Number(v) || 0);
 
+const inflight = new Map<string, Promise<unknown>>();
 async function gt<T>(path: string): Promise<T> {
-  const r = await fetch(`${GT}${path}`, { headers: { accept: "application/json" } });
-  if (!r.ok) throw new Error(r.status === 429 ? "Rate limited, retrying…" : r.status === 404 ? "Not found" : "Data source busy, retrying…");
-  return (await r.json()) as T;
+  const key = `gt:${path}`;
+  let cached: { t: number; v: T } | null = null;
+  try {
+    cached = JSON.parse(sessionStorage.getItem(key) || "null");
+  } catch {}
+  if (cached && Date.now() - cached.t < 15_000) return cached.v;
+  if (inflight.has(path)) return inflight.get(path) as Promise<T>;
+  const job = (async () => {
+    let r: Response | null = null;
+    try {
+      r = await fetch(`${GT}${path}`, { headers: { accept: "application/json" } });
+    } catch {}
+    if (!r?.ok) {
+      if (cached) return cached.v;
+      throw new Error(!r || r.status === 429 ? "Rate limited, retrying…" : r.status === 404 ? "Not found" : "Data source busy, retrying…");
+    }
+    const v = (await r.json()) as T;
+    try {
+      sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), v }));
+    } catch {}
+    return v;
+  })().finally(() => inflight.delete(path));
+  inflight.set(path, job);
+  return job;
 }
 
 type GtList = { data?: GtPool[]; included?: { id: string; attributes: Record<string, any> }[] };

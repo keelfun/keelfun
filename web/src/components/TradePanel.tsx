@@ -185,7 +185,7 @@ export function TradePanel({ token, defaultSide = "buy" }: { token: Token; defau
             }}
             placeholder="0"
             inputMode="decimal"
-            className="min-w-0 flex-1 bg-transparent text-4xl outline-none placeholder:text-dim"
+            className="w-0 min-w-0 flex-1 bg-transparent text-4xl outline-none placeholder:text-dim"
           />
           {pill(payEth)}
         </div>

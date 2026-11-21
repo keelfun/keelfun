@@ -227,7 +227,7 @@ export function AnySwap({ initialGet }: { initialGet?: string | null } = {}) {
       <div className="rounded-2xl border border-transparent bg-bg/70 p-4 focus-within:border-line-2">
         <p className="text-xs text-dim">You pay</p>
         <div className="mt-2 flex items-center gap-3">
-          <input value={amount} onChange={(e) => { setMsg(null); setAmount(e.target.value.replace(/[^0-9.]/g, "")); }} placeholder="0" inputMode="decimal" className="min-w-0 flex-1 bg-transparent text-4xl outline-none placeholder:text-dim" />
+          <input value={amount} onChange={(e) => { setMsg(null); setAmount(e.target.value.replace(/[^0-9.]/g, "")); }} placeholder="0" inputMode="decimal" className="w-0 min-w-0 flex-1 bg-transparent text-4xl outline-none placeholder:text-dim" />
           {tokenBtn(pay, "pay")}
         </div>
         <div className="mt-2 flex justify-between text-xs text-dim">

@@ -180,7 +180,7 @@ function TerminalHeader({ active }: { active: (h: string) => boolean }) {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
           <a href="https://keelfun.app/" className="hidden h-9 items-center rounded-lg border border-line px-3 text-sm text-muted hover:text-fg sm:flex">{BRAND} ↗</a>
           <a href="https://keelfun.app/launch/" className="hidden h-9 items-center whitespace-nowrap rounded-lg border border-accent/40 px-3 text-sm font-medium text-accent hover:bg-accent/10 xl:flex">+ Launch</a>
           <SearchK />

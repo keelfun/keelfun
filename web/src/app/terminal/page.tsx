@@ -349,7 +349,7 @@ export default function TerminalPage() {
   const cols = src === "base" ? BASE_COLS : COLS;
   return (
     <div className="relative left-1/2 -mb-20 flex h-[calc(100dvh-6.5rem)] w-screen -translate-x-1/2 flex-col border-t border-line lg:h-[calc(100dvh-3.5rem)]">
-      <div className="flex items-center gap-3 border-b border-line px-3 py-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-3 py-2">
         {!tracker && (
           <button onClick={() => setTracker(true)} className="hidden h-8 rounded-md border border-line px-2 text-xs text-muted hover:text-fg xl:block">Wallet tracker</button>
         )}
