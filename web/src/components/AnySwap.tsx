@@ -6,11 +6,11 @@ import { chain } from "@/lib/config";
 import { STOCKS } from "@/lib/stocks";
 import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
 
-type Cur = { address: string; symbol: string; name: string; decimals: number; logo?: string };
+export type Cur = { address: string; symbol: string; name: string; decimals: number; logo?: string };
 const ZERO = "0x0000000000000000000000000000000000000000";
 const DEAD = "0x000000000000000000000000000000000000dEaD";
 const RELAY = "https://api.relay.link";
-const ETH: Cur = { address: ZERO, symbol: "ETH", name: "Ether", decimals: 18, logo: "https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg" };
+export const ETH: Cur = { address: ZERO, symbol: "ETH", name: "Ether", decimals: 18, logo: "https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg" };
 const USDC: Cur = { address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", symbol: "USDC", name: "USD Coin", decimals: 6, logo: "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png" };
 
 type Quote = {
@@ -20,7 +20,7 @@ type Quote = {
   fees?: { relayer?: { amountUsd?: string } };
 };
 
-async function search(term: string): Promise<Cur[]> {
+export async function search(term: string): Promise<Cur[]> {
   const body: Record<string, unknown> = { chainIds: [chain.id], limit: 25 };
   if (/^0x[0-9a-fA-F]{40}$/.test(term)) body.address = term;
   else if (term) body.term = term;
@@ -30,7 +30,7 @@ async function search(term: string): Promise<Cur[]> {
   return Array.isArray(j) ? j.map((c) => ({ address: c.address.toLowerCase(), symbol: c.symbol, name: c.name, decimals: c.decimals, logo: c.metadata?.logoURI })) : [];
 }
 
-async function getQuote(user: string, a: Cur, b: Cur, amount: string, signal?: AbortSignal) {
+export async function getQuote(user: string, a: Cur, b: Cur, amount: string, signal?: AbortSignal) {
   const r = await fetch(`${RELAY}/quote`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -124,7 +124,7 @@ function Picker({ onPick, onClose }: { onPick: (c: Cur) => void; onClose: () => 
   );
 }
 
-export function AnySwap() {
+export function AnySwap({ initialGet }: { initialGet?: string | null } = {}) {
   const { address } = useAccount();
   const ensureWallet = useEnsureWallet();
   const confirm = useConfirm();
@@ -137,6 +137,10 @@ export function AnySwap() {
   const [qErr, setQErr] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    if (!initialGet || !/^0x[0-9a-fA-F]{40}$/.test(initialGet)) return;
+    search(initialGet).then((l) => l[0] && setGet(l[0])).catch(() => {});
+  }, [initialGet]);
   const bal = useBal(pay, address);
   const balGet = useBal(get, address);
 

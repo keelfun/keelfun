@@ -51,7 +51,7 @@ function SwapView() {
               <TradePanel token={one.token} />
             </>
           ) : (
-            <AnySwap />
+            <AnySwap initialGet={params.get("buy")} />
           )}
         </div>
         <div className="space-y-4">
