@@ -6,12 +6,79 @@ import { chain, EXPLORER } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
 import {
-  createVault, deleteVault, exportBackup, lock, restoreBackup, unlock, useVault, vaultActions, vaultClient, vaultMessage, vaultPublic, type VaultWallet,
+  createVault, deleteVault, exportBackup, lock, restoreBackup, unlock, useVault, vaultActions, vaultClient, vaultMessage, vaultPublic, type TokenMeta, type VaultAct, type VaultWallet,
 } from "@/lib/vault";
+import { useVaultHoldings, vaultSell, type Holding } from "@/lib/vaultHoldings";
+import { TokenAvatar } from "@/components/TokenAvatar";
+
+const usd = (n: number) => (n >= 1 ? `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : n > 0 ? `$${n.toPrecision(3)}` : "—");
+const amt = (n: number) => (n >= 1000 ? n.toLocaleString(undefined, { maximumFractionDigits: 0 }) : n.toLocaleString(undefined, { maximumSignificantDigits: 5 }));
+
+function Holdings({ w, tracked, acts, onErr }: { w: VaultWallet; tracked: TokenMeta[]; acts: VaultAct[]; onErr: (m: string) => void }) {
+  const q = useVaultHoldings(w, tracked);
+  const [busy, setBusy] = useState("");
+  const sell = async (h: Holding, pct: number) => {
+    setBusy(`${h.meta.address}${pct}`);
+    try {
+      await vaultSell(w, h, pct);
+      q.refetch();
+    } catch (e) {
+      onErr(errMsg(e));
+    } finally {
+      setBusy("");
+    }
+  };
+  const list = q.data ?? [];
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <div className="mb-2 flex items-center text-xs text-dim">
+        <span>Tokens</span>
+        {list.length > 0 && <span className="ml-auto font-mono">{usd(list.reduce((a, h) => a + h.usd, 0))}</span>}
+      </div>
+      {q.isLoading ? (
+        <p className="text-xs text-dim">Loading tokens…</p>
+      ) : !list.length ? (
+        <p className="text-xs text-dim">No tokens yet. Tokens you buy with this wallet show up here.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {list.map((h) => (
+            <div key={h.meta.address} className="flex flex-wrap items-center gap-2 rounded-lg bg-bg/60 px-2 py-1.5">
+              <a href={h.meta.keel ? `/token/?a=${h.meta.address}` : `/pair/?t=${h.meta.address}`} className="flex min-w-0 items-center gap-2">
+                <TokenAvatar src={h.meta.image} symbol={h.meta.symbol} size={24} className="!rounded-full" />
+                <span className="truncate text-sm font-medium">{h.meta.symbol}</span>
+              </a>
+              <span className="font-mono text-xs text-muted">{amt(h.amount)}</span>
+              <span className="font-mono text-xs text-dim">{usd(h.usd)}</span>
+              <div className="ml-auto flex gap-1">
+                {[25, 50, 100].map((p) => (
+                  <button key={p} onClick={() => sell(h, p)} disabled={!!busy} className="h-7 rounded-md border border-down/40 px-2 font-mono text-[11px] text-down hover:bg-down/10 disabled:opacity-40">
+                    {busy === `${h.meta.address}${p}` ? "…" : p === 100 ? "Sell all" : `${p}%`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {acts.length > 0 && (
+        <div className="mt-3 space-y-1">
+          {acts.slice(0, 5).map((a) => (
+            <a key={a.hash + a.ts} href={`${EXPLORER}/tx/${a.hash}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[11px] text-dim hover:text-fg">
+              <span className={a.side === "buy" ? "text-up" : "text-down"}>{a.side === "buy" ? "Buy" : "Sell"}</span>
+              <span className="text-muted">{a.symbol}</span>
+              {a.eth ? <span className="font-mono">{a.eth.toPrecision(3)} ETH</span> : null}
+              <span className="ml-auto">{new Date(a.ts).toLocaleString()}</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const btn = "h-10 rounded-xl px-4 text-sm font-semibold disabled:opacity-40";
 
-function Row({ w, i, groups, onErr }: { w: VaultWallet; i: number; groups: number[][]; onErr: (m: string) => void }) {
+function Row({ w, i, groups, tracked, acts, onErr }: { w: VaultWallet; i: number; groups: number[][]; tracked: TokenMeta[]; acts: VaultAct[]; onErr: (m: string) => void }) {
   const { address } = useAccount();
   const bal = useBalance({ address: w.address, chainId: chain.id, query: { refetchInterval: 8000 } });
   const ensure = useEnsureWallet();
@@ -78,6 +145,7 @@ function Row({ w, i, groups, onErr }: { w: VaultWallet; i: number; groups: numbe
         </button>
       </div>
       {busy && <p className="mt-2 text-xs text-muted">{busy}</p>}
+      <Holdings w={w} tracked={tracked} acts={acts} onErr={onErr} />
       {show && (
         <p className="mt-3 break-all rounded-lg border border-warn/40 bg-warn/5 p-2 font-mono text-[11px] text-warn">
           {w.pk}
@@ -180,7 +248,7 @@ export default function WalletsPage() {
             <span className="text-xs text-dim">Wallets tagged P1/P2/P3 buy when that preset is active. Untagged presets use your connected wallet.</span>
           </div>
           {d.wallets.map((w, i) => (
-            <Row key={w.address} w={w} i={i} groups={d.groups} onErr={setErr} />
+            <Row key={w.address} w={w} i={i} groups={d.groups} tracked={d.tokens?.[w.address.toLowerCase()] ?? []} acts={(d.activity ?? []).filter((x) => x.wallet === w.address.toLowerCase())} onErr={setErr} />
           ))}
           <div className="flex gap-2">
             <input value={imp} onChange={(e) => setImp(e.target.value)} placeholder="Import a private key (0x…)" type="password" className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-bg px-3 font-mono text-xs outline-none focus:border-accent" />

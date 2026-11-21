@@ -8,7 +8,7 @@ import type { Token } from "@/lib/api";
 import type { BasePool } from "@/lib/basePools";
 import { ADDR, chain } from "@/lib/config";
 import { useConfirm, useEnsureWallet } from "@/lib/tx";
-import { vaultClient, vaultPlan, vaultPublic } from "@/lib/vault";
+import { vaultActions, vaultClient, vaultPlan, vaultPublic } from "@/lib/vault";
 
 export type Preset = { amount: string; slippage: number };
 type Prefs = { active: number; presets: Preset[] };
@@ -122,6 +122,7 @@ export function useKeelBuy() {
             args: [t.address, value, (result[1] * BigInt(100 - p.slippage)) / 100n, w.address, BigInt(Math.floor(Date.now() / 1000) + 600)], value,
           });
           if ((await pub.waitForTransactionReceipt({ hash: h })).status !== "success") throw new Error(`Buy reverted for ${w.name}`);
+          await vaultActions.record(w.address, { address: t.address, symbol: t.symbol, name: t.name, decimals: 18, image: t.image ?? null, keel: true }, { side: "buy", eth: amount, hash: h });
         }),
       );
       return;
@@ -152,13 +153,16 @@ export function useRelayBuy() {
         plan.map(async ({ w, amount }) => {
           const q = await getQuote(w.address, ETH, { address: t.address, symbol: t.symbol, name: t.name, decimals: t.decimals }, parseEther(amount.toFixed(18)).toString());
           const c = vaultClient(w);
+          let last = "";
           for (const s of q.steps) {
             if (s.kind !== "transaction") continue;
             for (const it of s.items) {
               const h = await c.sendTransaction({ to: it.data.to, data: it.data.data, value: BigInt(it.data.value || "0") });
               if ((await pub.waitForTransactionReceipt({ hash: h })).status !== "success") throw new Error(`Swap reverted for ${w.name}`);
+              last = h;
             }
           }
+          await vaultActions.record(w.address, { address: t.address as `0x${string}`, symbol: t.symbol, name: t.name, decimals: t.decimals, image: t.image ?? null }, { side: "buy", eth: amount, hash: last });
         }),
       );
       return;

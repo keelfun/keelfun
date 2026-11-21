@@ -6,7 +6,15 @@ import { chain, RPC_URL } from "./config";
 import { BASE_RPCS } from "./wagmi";
 
 export type VaultWallet = { name: string; pk: Hex; address: `0x${string}` };
-export type VaultData = { wallets: VaultWallet[]; groups: number[][]; mode: "total" | "each" };
+export type TokenMeta = { address: `0x${string}`; symbol: string; name: string; decimals: number; image: string | null; keel?: boolean };
+export type VaultAct = { ts: number; wallet: string; side: "buy" | "sell"; symbol: string; token: string; eth?: number; hash: string };
+export type VaultData = {
+  wallets: VaultWallet[];
+  groups: number[][];
+  mode: "total" | "each";
+  tokens?: Record<string, TokenMeta[]>;
+  activity?: VaultAct[];
+};
 type Stored = { v: 1; kind: "sig" | "password"; owner?: string; salt: string; iv: string; ct: string; created: number };
 
 const KEY = "keel-vault";
@@ -119,6 +127,17 @@ export const vaultActions = {
     update((d) => ({ ...d, wallets: d.wallets.filter((_, j) => j !== i), groups: d.groups.map((g) => g.filter((x) => x !== i).map((x) => (x > i ? x - 1 : x))) })),
   toggleGroup: (g: number, i: number) => update((d) => ({ ...d, groups: d.groups.map((x, j) => (j !== g ? x : x.includes(i) ? x.filter((y) => y !== i) : [...x, i].sort())) })),
   setMode: (mode: "total" | "each") => update((d) => ({ ...d, mode })),
+  record: (wallet: string, t: TokenMeta, act: Omit<VaultAct, "ts" | "wallet" | "symbol" | "token">) =>
+    update((d) => {
+      const k = wallet.toLowerCase();
+      const list = d.tokens?.[k] ?? [];
+      const has = list.some((x) => x.address.toLowerCase() === t.address.toLowerCase());
+      return {
+        ...d,
+        tokens: { ...d.tokens, [k]: has ? list : [...list, t] },
+        activity: [{ ts: Date.now(), wallet: k, symbol: t.symbol, token: t.address.toLowerCase(), ...act }, ...(d.activity ?? [])].slice(0, 200),
+      };
+    }),
 };
 
 export function exportBackup() {
