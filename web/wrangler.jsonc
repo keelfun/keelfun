@@ -2,9 +2,11 @@
   "name": "keel-web",
   "account_id": "bc6c2a61a3e242fd07bef2a7dc1ec916",
   "compatibility_date": "2025-09-01",
-  "assets": { "directory": "./out", "not_found_handling": "404-page", "html_handling": "auto-trailing-slash" },
+  "main": "worker.js",
+  "assets": { "directory": "./out", "binding": "ASSETS", "run_worker_first": true, "not_found_handling": "404-page", "html_handling": "auto-trailing-slash" },
   "routes": [
     { "pattern": "keelfun.app", "custom_domain": true },
-    { "pattern": "www.keelfun.app", "custom_domain": true }
+    { "pattern": "www.keelfun.app", "custom_domain": true },
+    { "pattern": "terminal.keelfun.app", "custom_domain": true }
   ]
 }

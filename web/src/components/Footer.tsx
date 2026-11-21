@@ -4,7 +4,7 @@ import { Logo } from "./Header";
 import { Socials } from "./Socials";
 
 const COLS: [string, [string, string][]][] = [
-  [BRAND, [["Discover", "/"], ["Terminal", "/terminal/"], ["Trending", "/trending/"], ["Traders", "/traders/"], ["Chain", "/chain/"], ["Launch a token", "/launch/"], ["Swap", "/swap/"], ["Bridge", "/bridge/"], ["Portfolio", "/portfolio/"], ["Buyback", "/buyback/"], ["Flywheel", "/flywheel/"], ["Revenue", "/revenue/"], ["Builders", "/builders/"]]],
+  [BRAND, [["Discover", "/"], ["Terminal", "https://terminal.keelfun.app/"], ["Trending", "https://terminal.keelfun.app/trending/"], ["Traders", "https://terminal.keelfun.app/traders/"], ["Chain", "https://terminal.keelfun.app/chain/"], ["Launch a token", "/launch/"], ["Swap", "/swap/"], ["Bridge", "/bridge/"], ["Portfolio", "/portfolio/"], ["Buyback", "/buyback/"], ["Flywheel", "/flywheel/"], ["Revenue", "/revenue/"], ["Builders", "/builders/"]]],
   ["Learn", [[`How ${BRAND} works`, "/docs/"], ["Fees, explained", "/docs/"], ["Holder rewards", "/docs/"]]],
   ["Build", [["Developer API", "/api/"], [`Build on ${BRAND}`, "/builders/"], ["Builder programme", "/builders/#join"], ["Platform fees", "/admin/"]]],
 ];
