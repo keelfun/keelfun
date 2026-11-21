@@ -33,7 +33,7 @@ export const chain = [base, baseSepolia, localChain].find((c) => c.id === chainI
 export const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || chain.rpcUrls.default.http[0];
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 export const EXPLORER = (process.env.NEXT_PUBLIC_EXPLORER || chain.blockExplorers?.default.url || "").replace(/\/$/, "");
-export const BRAND = process.env.NEXT_PUBLIC_BRAND || "Keel";
+export const BRAND = process.env.NEXT_PUBLIC_BRAND || "Keelfun";
 export const SOCIALS = {
   x: process.env.NEXT_PUBLIC_X_URL || "https://x.com/Keelfunxyz",
   github: process.env.NEXT_PUBLIC_GITHUB_URL || "https://github.com/keelfun/keelfun",

@@ -3,7 +3,7 @@ export type ThemeColors = Record<(typeof THEME_KEYS)[number], string>;
 const mk = (v: string): ThemeColors => Object.fromEntries(v.split(" ").map((c, i) => [THEME_KEYS[i], c])) as ThemeColors;
 
 export const THEMES: { id: string; name: string; colors: ThemeColors }[] = [
-  { id: "keel", name: "Keel", colors: mk("#05070d #0b0f1a #111727 #1c2436 #27314a #3d7bff #7fd4ff #bcd3ff #ffffff") },
+  { id: "keel", name: "Keelfun", colors: mk("#05070d #0b0f1a #111727 #1c2436 #27314a #3d7bff #7fd4ff #bcd3ff #ffffff") },
   { id: "dark", name: "Dark", colors: mk("#0a0a0b #111113 #18181b #232327 #2e2e33 #7cb7ff #a9d4ff #cfe4ff #06121f") },
   { id: "dusk", name: "Dusk", colors: mk("#070818 #0d0f24 #14173a #1f2350 #2a2f66 #5b6cff #8f9bff #c5ccff #ffffff") },
   { id: "astro", name: "Astro", colors: mk("#0a0716 #120d24 #1a1433 #261d48 #32275c #8b5cf6 #c4a5ff #ddd0ff #ffffff") },

@@ -261,7 +261,7 @@ function PortfolioView() {
               </tbody>
             </table>
             {!(ready && data.trades.length) && (
-              <Empty><p className="text-muted">Your buys and sells in every Keel market, newest first.</p></Empty>
+              <Empty><p className="text-muted">Your buys and sells in every Keelfun market, newest first.</p></Empty>
             )}
           </div>
         </section>

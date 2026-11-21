@@ -52,7 +52,7 @@ export default function AdminPage() {
 
   return (
     <div>
-      <PageHero title={<>Platform <Em>fees</Em></>} sub="Protocol fees collect in the Keel hook, per pair asset. Only the hook owner can withdraw them." />
+      <PageHero title={<>Platform <Em>fees</Em></>} sub="Protocol fees collect in the Keelfun hook, per pair asset. Only the hook owner can withdraw them." />
       <div className="mx-auto max-w-xl rounded-3xl border border-line bg-panel p-5">
         <p className="text-xs text-dim">Ready to withdraw</p>
         <ul className="mt-3 divide-y divide-line">

@@ -7,6 +7,7 @@ import { LangButton, ThemeButton } from "./Prefs";
 
 const NAV = [
   { href: "/", label: "Discover" },
+  { href: "/terminal/", label: "Terminal" },
   { href: "/launch/", label: "Launch" },
   { href: "/swap/", label: "Swap" },
   { href: "/portfolio/", label: "Portfolio" },

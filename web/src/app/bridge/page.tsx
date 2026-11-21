@@ -227,10 +227,10 @@ export default function BridgePage() {
         <h2 className="font-serif text-4xl">Questions</h2>
         <Faq
           items={[
-            ["Does Keel hold my money?", "No. You sign the transaction from your own wallet and Relay delivers the ETH to the address you chose. Keel never takes custody of it."],
+            ["Does Keelfun hold my money?", "No. You sign the transaction from your own wallet and Relay delivers the ETH to the address you chose. Keelfun never takes custody of it."],
             ["How long does it take?", "Usually seconds to a minute in both directions. If a route fails, Relay refunds you on the chain you sent from."],
             ["Can I send from an exchange?", "Withdraw ETH from the exchange straight to your wallet on Base. Most exchanges support Base withdrawals, so you may not need a bridge at all."],
-            ["What does it cost?", "The fee shown above, plus the gas of the transaction you sign. Keel adds nothing on top."],
+            ["What does it cost?", "The fee shown above, plus the gas of the transaction you sign. Keelfun adds nothing on top."],
           ]}
         />
       </section>
