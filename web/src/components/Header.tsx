@@ -14,6 +14,7 @@ const TERM = [
   { href: "/traders/", label: "Traders", desc: "PnL leaderboard" },
   { href: "/chain/", label: "Chain", desc: "Base volume by DEX" },
   { href: "/portfolio/", label: "Portfolio", desc: "Any wallet, read-only" },
+  { href: "/wallets/", label: "Wallets", desc: "Trading wallets for one-click buys" },
 ];
 const PRIMARY = [
   { href: "/", label: "Discover" },

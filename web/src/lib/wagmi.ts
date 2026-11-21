@@ -5,7 +5,7 @@ import { coinbaseWallet } from "@wagmi/connectors/coinbaseWallet";
 import { arbitrum, linea, mainnet, optimism } from "viem/chains";
 import { BRAND, chain, RPC_URL, WC_PROJECT_ID } from "./config";
 
-const BASE_RPCS = ["https://base-rpc.publicnode.com", "https://base.drpc.org", "https://gateway.tenderly.co/public/base", "https://base.llamarpc.com"];
+export const BASE_RPCS = ["https://base-rpc.publicnode.com", "https://base.drpc.org", "https://gateway.tenderly.co/public/base", "https://base.llamarpc.com"];
 
 export const BRIDGE_CHAINS = [mainnet, arbitrum, optimism, linea] as const;
 
