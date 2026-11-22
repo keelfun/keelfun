@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
 import { formatUnits, isAddress } from "viem";
 import { useAccount, useReadContracts } from "wagmi";
 import { ConnectButton } from "@/components/ConnectButton";
@@ -9,7 +10,8 @@ import { Em, PageHero } from "@/components/PageHero";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { useClaim } from "@/components/FeesCard";
 import { launchHookAbi, launchTokenAbi } from "@/lib/abis";
-import { usePortfolio, type Portfolio, type Token } from "@/lib/api";
+import { api, usePortfolio, type Portfolio, type Token } from "@/lib/api";
+import { useVault } from "@/lib/vault";
 import { ADDR, EXPLORER, chain, pairInfo } from "@/lib/config";
 import { fmtCompact, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
 
@@ -96,16 +98,93 @@ function useEarnings(data: Portfolio | undefined, wallet?: `0x${string}`) {
   return { holder, route, loaded: !!q.data || held.length + created.length === 0, refetch: q.refetch };
 }
 
+const WATCH_KEY = "keel-watch-addrs";
+
+function merge(list: Portfolio[]): Portfolio | undefined {
+  if (!list.length) return undefined;
+  const h = new Map<string, Portfolio["holdings"][number]>();
+  for (const p of list)
+    for (const x of p.holdings) {
+      const k = x.token.address.toLowerCase();
+      const c = h.get(k);
+      h.set(k, c ? { ...c, amount: c.amount + x.amount, valueEth: c.valueEth + x.valueEth, valueUsd: c.valueUsd + x.valueUsd } : x);
+    }
+  return {
+    holdings: [...h.values()].sort((a, b) => b.valueEth - a.valueEth),
+    created: list.flatMap((p) => p.created),
+    trades: list.flatMap((p) => p.trades).sort((a, b) => b.ts - a.ts),
+    ethUsd: list[0].ethUsd,
+  };
+}
+
+function WalletBar({ current }: { current: string }) {
+  const router = useRouter();
+  const { address } = useAccount();
+  const v = useVault();
+  const [watch, setWatch] = useState<string[]>([]);
+  const [input, setInput] = useState("");
+  useEffect(() => {
+    try {
+      setWatch(JSON.parse(localStorage.getItem(WATCH_KEY) || "[]"));
+    } catch {}
+  }, []);
+  const save = (n: string[]) => (setWatch(n), localStorage.setItem(WATCH_KEY, JSON.stringify(n)));
+  const go = (w: string) => router.push(w ? `/portfolio/?w=${w}` : "/portfolio/");
+  const add = () => {
+    const a = input.trim().toLowerCase();
+    if (!isAddress(a)) return;
+    if (!watch.includes(a)) save([...watch, a]);
+    setInput("");
+    go(a);
+  };
+  const chip = (on: boolean) =>
+    `flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs ${on ? "border-accent text-accent" : "border-line text-muted hover:text-fg"}`;
+  const vw = v.data?.wallets ?? [];
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-2">
+      {address && <button onClick={() => go("")} className={chip(current === "" || current === address.toLowerCase())}>Connected</button>}
+      {vw.length > 0 && (
+        <button onClick={() => go("vault")} className={chip(current === "vault")}>All trading wallets ({vw.length})</button>
+      )}
+      {vw.map((w) => (
+        <button key={w.address} onClick={() => go(w.address.toLowerCase())} className={chip(current === w.address.toLowerCase())}>
+          {w.name}
+        </button>
+      ))}
+      {v.exists && !v.data && <Link href="/wallets/" className={chip(false)}>Unlock vault for trading wallets</Link>}
+      {watch.map((w) => (
+        <span key={w} className={chip(current === w)}>
+          <button onClick={() => go(w)} className="font-mono">{shortAddr(w)}</button>
+          <button onClick={() => (save(watch.filter((x) => x !== w)), current === w && go(""))} className="text-dim hover:text-down" aria-label="Remove">×</button>
+        </span>
+      ))}
+      <form onSubmit={(e) => (e.preventDefault(), add())} className="flex h-8 items-center rounded-lg border border-line bg-bg/60 pl-2.5">
+        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Watch any address 0x…" className="w-44 bg-transparent font-mono text-xs outline-none placeholder:text-dim" />
+        <button disabled={!isAddress(input.trim())} className="px-2.5 text-xs text-accent disabled:text-dim">+ Watch</button>
+      </form>
+    </div>
+  );
+}
+
 function PortfolioView() {
   const params = useSearchParams();
   const { address } = useAccount();
   const viewing = params.get("w");
-  const wallet = (viewing && isAddress(viewing) ? viewing : address) as `0x${string}` | undefined;
+  const v = useVault();
+  const agg = viewing === "vault";
+  const vaultAddrs = agg ? (v.data?.wallets ?? []).map((w) => w.address.toLowerCase()) : [];
+  const wallet = (agg ? undefined : viewing && isAddress(viewing) ? viewing : address) as `0x${string}` | undefined;
   const own = !!address && wallet?.toLowerCase() === address.toLowerCase();
-  const { data, isLoading } = usePortfolio(wallet);
+  const one = usePortfolio(wallet);
+  const many = useQueries({
+    queries: vaultAddrs.map((a) => ({ queryKey: ["portfolio", a], queryFn: () => api<Portfolio>(`/portfolio/${a}`), refetchInterval: 15000 })),
+  });
+  const manyData = many.every((q) => q.data) ? merge(many.map((q) => q.data!)) : undefined;
+  const data = agg ? manyData : one.data;
+  const isLoading = agg ? many.some((q) => q.isLoading) : one.isLoading;
   const e = useEarnings(data, wallet);
   const ethUsd = data?.ethUsd ?? 0;
-  const ready = !!wallet && !!data;
+  const ready = (!!wallet || agg) && !!data;
 
   const holdUsd = data?.holdings.reduce((a, h) => a + h.valueEth * ethUsd, 0) ?? 0;
   const earnedUsd = data?.holdings.reduce((a, h) => a + usdOf(h.token, e.holder.get(h.token.address.toLowerCase()) ?? 0n, ethUsd), 0) ?? 0;
@@ -115,11 +194,12 @@ function PortfolioView() {
   return (
     <>
       <PageHero
-        title={<>{own || !wallet ? "Your" : shortAddr(wallet)} <Em>portfolio</Em></>}
+        title={<>{agg ? "Trading wallets" : own || !wallet ? "Your" : shortAddr(wallet)} <Em>portfolio</Em></>}
         sub="What you hold and what it has paid you, the tokens you launched and the fees they pay you."
       >
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-          {wallet ? <p className="font-mono text-xs text-dim">{shortAddr(wallet)}</p> : <span />}
+        <WalletBar current={agg ? "vault" : (viewing ?? "").toLowerCase()} />
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+          {agg ? <p className="text-xs text-dim">{vaultAddrs.length} trading wallets combined</p> : wallet ? <p className="font-mono text-xs text-dim">{shortAddr(wallet)}</p> : <span />}
           <Link href="/launch/" className="rounded-lg border border-line bg-bg/60 px-4 py-2 text-sm hover:border-accent">
             Launch a token
           </Link>
@@ -174,7 +254,7 @@ function PortfolioView() {
                 )}
               </tbody>
             </table>
-            {!wallet ? (
+            {!wallet && !agg ? (
               <Empty>
                 <p>Connect a wallet to see your portfolio.</p>
                 <ConnectButton />

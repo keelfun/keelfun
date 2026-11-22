@@ -202,6 +202,10 @@ export class Indexer extends DurableObject<Env> {
         code TEXT PRIMARY KEY, name TEXT, url TEXT, kind TEXT, description TEXT, payout TEXT, signature TEXT,
         approved INTEGER DEFAULT 0, created INTEGER
       );
+      CREATE TABLE IF NOT EXISTS scheduled (
+        id TEXT PRIMARY KEY, creator TEXT, name TEXT, symbol TEXT, description TEXT, image TEXT, pair TEXT,
+        website TEXT, x TEXT, telegram TEXT, launch_at INTEGER, created INTEGER, signature TEXT
+      );
     `);
     try {
       this.sql.exec("ALTER TABLE tokens ADD COLUMN meta_tries INTEGER DEFAULT 0");
@@ -535,6 +539,7 @@ export class Indexer extends DurableObject<Env> {
         if (parts[0] === "upload") return await this.upload(req, url);
         if (parts[0] === "metadata") return await this.saveMetadata(req, url);
         if (parts[0] === "builders") return await this.registerBuilder(req);
+        if (parts[0] === "scheduled") return await this.schedule(req);
         return json({ error: "not found" }, 404);
       }
       switch (parts[0]) {
@@ -550,6 +555,8 @@ export class Indexer extends DurableObject<Env> {
           return json(this.traders(url.searchParams));
         case "builders":
           return json(this.builders());
+        case "scheduled":
+          return json(this.scheduled(parts[1]));
         case "revenue":
           return json(this.revenue());
         case "flywheel":
@@ -861,18 +868,18 @@ export class Indexer extends DurableObject<Env> {
     const rows = this.sql
       .exec(
         `SELECT tr.trader, tr.token, tr.is_buy, tr.eth, tr.tokens, tr.ts, t.pair, t.symbol, t.image, t.price, t.creator
-         FROM trades tr JOIN tokens t ON t.address = tr.token WHERE tr.ts >= ?`,
+         FROM trades tr JOIN tokens t ON t.address = tr.token WHERE tr.ts >= ? ORDER BY tr.ts`,
         since,
       )
       .toArray();
     type Pos = { buyEth: number; sellEth: number; buyTok: number; sellTok: number; symbol: string; image: string | null; price: number };
-    const by = new Map<string, { pos: Map<string, Pos>; buys: number; sells: number; last: number; dev: boolean }>();
+    const by = new Map<string, { pos: Map<string, Pos>; buys: number; sells: number; first: number; last: number; dev: boolean; cum: number; peak: number; dd: number; flips: number; lastSide: Map<string, [number, number]> }>();
     const devs = new Set(this.sql.exec("SELECT DISTINCT creator FROM tokens").toArray().map((r) => String(r.creator)));
     for (const r of rows) {
       const k = this.pairEth(r.pair);
       const w = String(r.trader);
       let a = by.get(w);
-      if (!a) by.set(w, (a = { pos: new Map(), buys: 0, sells: 0, last: 0, dev: devs.has(w) }));
+      if (!a) by.set(w, (a = { pos: new Map(), buys: 0, sells: 0, first: Number(r.ts), last: 0, dev: devs.has(w), cum: 0, peak: 0, dd: 0, flips: 0, lastSide: new Map() }));
       let p = a.pos.get(String(r.token));
       if (!p) a.pos.set(String(r.token), (p = { buyEth: 0, sellEth: 0, buyTok: 0, sellTok: 0, symbol: String(r.symbol), image: (r.image as string) ?? null, price: Number(r.price ?? 0) * k }));
       const eth = Number(r.eth) * k;
@@ -881,10 +888,19 @@ export class Indexer extends DurableObject<Env> {
         p.buyTok += Number(r.tokens);
         a.buys++;
       } else {
+        const held = p.buyTok - p.sellTok;
+        if (p.buyTok > 0 && held > 0) {
+          a.cum += eth - (p.buyEth / p.buyTok) * Math.min(Number(r.tokens), held);
+          a.peak = Math.max(a.peak, a.cum);
+          a.dd = Math.max(a.dd, a.peak - a.cum);
+        }
         p.sellEth += eth;
         p.sellTok += Number(r.tokens);
         a.sells++;
       }
+      const ls = a.lastSide.get(String(r.token));
+      if (ls && ls[0] !== Number(r.is_buy) && Number(r.ts) - ls[1] <= 4) a.flips++;
+      a.lastSide.set(String(r.token), [Number(r.is_buy), Number(r.ts)]);
       a.last = Math.max(a.last, Number(r.ts));
     }
     const out = [...by.entries()].map(([wallet, a]) => {
@@ -907,7 +923,7 @@ export class Indexer extends DurableObject<Env> {
         if (!best || pnl > best.pnl) best = { symbol: p.symbol, image: p.image, pnl };
       }
       const pnl = realized + unrealized;
-      return { wallet, pnlEth: pnl, pnlPct: cost > 0 ? pnl / cost : 0, unrealizedEth: unrealized, open, volumeEth: volume, wins, losses, buys: a.buys, sells: a.sells, best, lastTs: a.last, dev: a.dev };
+      return { wallet, pnlEth: pnl, pnlPct: cost > 0 ? pnl / cost : 0, unrealizedEth: unrealized, open, volumeEth: volume, wins, losses, buys: a.buys, sells: a.sells, best, lastTs: a.last, dev: a.dev, maxDd: cost > 0 ? Math.min(1, a.dd / cost) : 0, bot: a.flips >= 3 || (a.buys + a.sells >= 40 && (a.last - a.first) / (a.buys + a.sells) < 12) };
     });
     out.sort((x, y) => y.pnlEth - x.pnlEth);
     return { traders: out.slice(0, 100), ethUsd: this.ethUsd() };
@@ -982,6 +998,49 @@ export class Indexer extends DurableObject<Env> {
       })),
       ethUsd: this.ethUsd(),
     };
+  }
+
+  private scheduled(id?: string) {
+    const now = Math.floor(Date.now() / 1000);
+    const rows = id
+      ? this.sql.exec("SELECT * FROM scheduled WHERE id = ?", id).toArray()
+      : this.sql.exec("SELECT * FROM scheduled WHERE launch_at > ? ORDER BY launch_at LIMIT 100", now - 7 * 86_400).toArray();
+    const out = rows.map((r) => {
+      const t = this.sql
+        .exec("SELECT address FROM tokens WHERE creator = ? AND UPPER(symbol) = ? AND launch_ts >= ? ORDER BY launch_ts LIMIT 1", String(r.creator), String(r.symbol), Number(r.launch_at) - 86_400)
+        .toArray()[0];
+      const { signature: _s, ...rest } = r;
+      return { ...rest, launch_at: Number(r.launch_at), token: t ? String(t.address) : null };
+    });
+    return id ? (out[0] ?? { error: "not found" }) : { scheduled: out.filter((x) => x.token || Number(x.launch_at) > now - 86_400) };
+  }
+
+  private async schedule(req: Request) {
+    const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!b) return json({ error: "invalid json" }, 400);
+    const s = (k: string, max: number) => (typeof b[k] === "string" ? (b[k] as string).trim().slice(0, max) : "");
+    const creator = lc(s("creator", 42));
+    const symbol = s("symbol", 10).toUpperCase();
+    const name = s("name", 32);
+    const at = Math.floor(Number(b.launchAt));
+    const now = Math.floor(Date.now() / 1000);
+    if (!/^0x[0-9a-f]{40}$/.test(creator)) return json({ error: "Invalid creator" }, 400);
+    if (!name || !/^[A-Z0-9]{1,10}$/.test(symbol)) return json({ error: "Name and ticker (1-10 letters/numbers) required" }, 400);
+    if (!(at > now + 60 && at < now + 30 * 86_400)) return json({ error: "Pick a time between 1 minute and 30 days from now" }, 400);
+    const pair = s("pair", 42);
+    if (pair && !/^0x[0-9a-fA-F]{40}$/.test(pair)) return json({ error: "Invalid pair" }, 400);
+    const ok = await verifyMessage({ address: creator as `0x${string}`, message: scheduleMessage(symbol, at, creator), signature: s("signature", 300) as `0x${string}` }).catch(() => false);
+    if (!ok) return json({ error: "Signature doesn't match the creator wallet" }, 400);
+    const n = Number(this.sql.exec("SELECT COUNT(*) AS n FROM scheduled WHERE creator = ? AND launch_at > ?", creator, now).toArray()[0]?.n ?? 0);
+    if (n >= 3) return json({ error: "Max 3 upcoming launches per wallet" }, 429);
+    const image = s("image", 300);
+    if (image && !/^https:\/\//.test(image)) return json({ error: "Invalid image" }, 400);
+    const id = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+    this.sql.exec(
+      "INSERT INTO scheduled (id, creator, name, symbol, description, image, pair, website, x, telegram, launch_at, created, signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      id, creator, name, symbol, str(s("description", 500)), str(image), str(lc(pair)), str(s("website", 200)), str(s("x", 200)), str(s("telegram", 200)), at, Date.now(), s("signature", 300),
+    );
+    return json({ ok: true, id });
   }
 
   private async registerBuilder(req: Request) {
@@ -1068,6 +1127,10 @@ function safeParseArr(s: string): unknown[] {
 
 const BUILDER_CODE = /^[a-z0-9-]{3,24}$/;
 const BUILDER_SHARE = 0.25;
+
+export function scheduleMessage(symbol: string, at: number, creator: string) {
+  return `Keelfun scheduled launch\nTicker: $${symbol}\nTime: ${new Date(at * 1000).toISOString()}\nCreator: ${creator.toLowerCase()}`;
+}
 
 export function builderMessage(code: string, payout: string) {
   return `Keel Builders\n\nCode: ${code}\nPayout wallet: ${payout.toLowerCase()}\n\nI accept the Keel Builders terms. This signature costs no gas and moves no funds.`;

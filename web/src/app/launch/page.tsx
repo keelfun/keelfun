@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { encodeAbiParameters, erc20Abi, getContractAddress, isAddress, keccak256, maxUint256, parseEventLogs, parseUnits, toHex } from "viem";
 import { useQuery } from "@tanstack/react-query";
 import { useAccount, useBalance, usePublicClient, useWriteContract } from "wagmi";
@@ -93,6 +93,7 @@ export default function LaunchPage() {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
   const [website, setWebsite] = useState("");
   const [x, setX] = useState("");
   const [telegram, setTelegram] = useState("");
@@ -135,7 +136,27 @@ export default function LaunchPage() {
     setAlloc((a) => ({ ...a, [k]: Math.max(0, Math.min(100, Math.round(v))) }));
   }
 
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get("s");
+    if (!id) return;
+    api<Record<string, string | null>>(`/scheduled/${encodeURIComponent(id)}`)
+      .then((r) => {
+        if (!r?.symbol) return;
+        setName(r.name ?? "");
+        setSymbol(r.symbol ?? "");
+        setDescription(r.description ?? "");
+        setWebsite(r.website ?? "");
+        setX(r.x ?? "");
+        setTelegram(r.telegram ?? "");
+        if (r.image) (setImageUrl(r.image), setPreview(r.image));
+        const i = PAIRS.findIndex((p) => p.address.toLowerCase() === (r.pair ?? PAIRS[0].address).toLowerCase());
+        if (i >= 0) setPairIdx(i);
+      })
+      .catch(() => {});
+  }, []);
+
   function pickFile(f: File | null) {
+    setImageUrl("");
     setError(null);
     if (f && f.size > 1_000_000) return setError("Image must be under 1 MB");
     if (f && !/^image\/(png|jpeg|gif|webp)$/.test(f.type)) return setError("Use a PNG, JPG, GIF or WEBP image");
@@ -171,7 +192,7 @@ export default function LaunchPage() {
     try {
       setStep("Connecting wallet…");
       const account = await ensureWallet();
-      let image = "";
+      let image = imageUrl;
       if (file) {
         setStep("Uploading image…");
         image = await uploadImage(file);

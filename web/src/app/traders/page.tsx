@@ -8,8 +8,9 @@ import { fmtPct, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
 
 type Trader = {
   wallet: string; pnlEth: number; pnlPct: number; unrealizedEth: number; open: number; volumeEth: number; wins: number; losses: number;
-  buys: number; sells: number; best: { symbol: string; image: string | null; pnl: number } | null; lastTs: number; dev: boolean;
+  buys: number; sells: number; best: { symbol: string; image: string | null; pnl: number } | null; lastTs: number; dev: boolean; maxDd?: number; bot?: boolean;
 };
+const DD = [["any", "Any", 2], ["25", "≤ 25%", 0.25], ["50", "≤ 50%", 0.5], ["75", "≤ 75%", 0.75]] as const;
 const WIN = ["1d", "7d", "30d", "all"] as const;
 
 function Ident({ a }: { a: string }) {
@@ -35,6 +36,8 @@ function Ident({ a }: { a: string }) {
 export default function TradersPage() {
   const [win, setWin] = useState<(typeof WIN)[number]>("7d");
   const [tracked, setTracked] = useState<string[]>([]);
+  const [dd, setDd] = useState<(typeof DD)[number][0]>("any");
+  const [bots, setBots] = useState(true);
   useEffect(() => {
     try {
       setTracked(JSON.parse(localStorage.getItem("keel-tracked") || "[]"));
@@ -50,6 +53,8 @@ export default function TradersPage() {
     queryFn: () => api<{ traders: Trader[]; ethUsd: number }>(`/traders?window=${win}`),
     refetchInterval: 30000,
   });
+  const lim = DD.find((d) => d[0] === dd)![2];
+  const rows = data?.traders.filter((t) => (t.maxDd ?? 0) <= lim && (bots || !t.bot));
   const usd = (eth: number) => fmtUsd(eth * (data?.ethUsd ?? 0));
   const signed = (eth: number) => `${eth > 0 ? "+" : eth < 0 ? "-" : ""}${usd(Math.abs(eth))}`;
   const th = "px-3 py-2.5 text-left text-xs font-normal text-dim";
@@ -66,6 +71,15 @@ export default function TradersPage() {
             <button key={w} onClick={() => setWin(w)} className={`rounded-md px-2.5 py-1 font-mono text-xs ${win === w ? "bg-panel-2 text-fg" : "text-dim hover:text-fg"}`}>{w === "all" ? "All" : w}</button>
           ))}
         </div>
+        <label className="flex items-center gap-1.5 text-xs text-muted">
+          Max DD
+          <select value={dd} onChange={(e) => setDd(e.target.value as typeof dd)} className="h-7 rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none">
+            {DD.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+        </label>
+        <button onClick={() => setBots((v) => !v)} className={`h-7 rounded-lg border px-2.5 text-xs ${bots ? "border-line text-muted hover:text-fg" : "border-accent text-accent"}`}>
+          {bots ? "Bots shown" : "Bots hidden"}
+        </button>
         <span className="ml-auto text-xs text-dim">{dataUpdatedAt ? `Updated ${timeAgo(Math.floor(dataUpdatedAt / 1000))} ago` : ""}</span>
       </div>
       <div className="overflow-x-auto rounded-2xl border border-line bg-panel">
@@ -78,13 +92,17 @@ export default function TradersPage() {
               <th className={`${th} text-right`}>Unrealized</th>
               <th className={`${th} text-right`}>Volume</th>
               <th className={`${th} text-right`}>Win rate</th>
+              <th className={`${th} text-right`}>Max DD</th>
               <th className={th}>Best trade</th>
               <th className={`${th} text-right`}>Last active</th>
               <th className={`${th} text-right`}>Action</th>
             </tr>
           </thead>
           <tbody className="font-mono">
-            {data?.traders.map((t, i) => {
+            {rows?.length === 0 && (
+              <tr><td colSpan={10} className="px-3 py-10 text-center font-sans text-muted">No traders match these filters</td></tr>
+            )}
+            {rows?.map((t, i) => {
               const total = t.wins + t.losses;
               return (
                 <tr key={t.wallet} className="border-b border-line/60 last:border-0 hover:bg-panel-2/50">
@@ -94,7 +112,8 @@ export default function TradersPage() {
                       <Ident a={t.wallet} />
                       <span>
                         <span className="block">{shortAddr(t.wallet)}</span>
-                        {t.dev && <span className="mt-0.5 inline-block rounded bg-warn/15 px-1 text-[10px] text-warn">DEV</span>}
+                        {t.dev && <span className="mt-0.5 mr-1 inline-block rounded bg-warn/15 px-1 text-[10px] text-warn">DEV</span>}
+                        {t.bot && <span className="mt-0.5 inline-block rounded bg-panel-2 px-1 text-[10px] text-muted">BOT</span>}
                       </span>
                     </Link>
                   </td>
@@ -111,6 +130,7 @@ export default function TradersPage() {
                     <p>{total ? Math.round((t.wins / total) * 100) : 0}%</p>
                     <p className="text-xs"><span className="text-up">{t.wins}</span> / <span className="text-down">{t.losses}</span></p>
                   </td>
+                  <td className={`px-3 py-3 text-right ${(t.maxDd ?? 0) > 0.5 ? "text-down" : "text-muted"}`}>{Math.round((t.maxDd ?? 0) * 100)}%</td>
                   <td className="px-3 py-3">
                     {t.best && (
                       <span className="flex items-center gap-1.5 font-sans">
