@@ -391,7 +391,7 @@ export default function PerpsPage() {
             {m?.name ?? coin}-USD <span className="rounded bg-panel-2 px-1.5 py-0.5 text-[10px] font-normal text-muted">{m ? `${m.maxLev}x` : ""}</span> <span className="text-xs text-muted">▾</span>
           </button>
           {open && (
-            <div className="absolute left-0 top-full z-50 mt-2 w-[min(92vw,640px)] rounded-xl border border-line bg-panel shadow-2xl">
+            <div className="absolute left-0 top-full z-50 mt-2 w-[min(92vw,640px)] max-sm:fixed max-sm:inset-x-2 max-sm:top-12 max-sm:mt-0 max-sm:w-auto rounded-xl border border-line bg-panel shadow-2xl">
               <div className="flex flex-wrap items-center gap-2 border-b border-line p-2">
                 <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${markets?.length ?? ""} markets`} className="h-8 min-w-0 flex-1 rounded-md border border-line bg-bg px-2 text-sm outline-none focus:border-accent" />
                 <div className="no-scrollbar flex gap-1 overflow-x-auto">

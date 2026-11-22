@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://keelfun.app"><b>keelfun.app</b></a> ·
-  <a href="https://x.com/Keelfunxyz">X @Keelfunxyz</a> ·
+  <a href="https://x.com/keelfunapp">X @keelfunapp</a> ·
   <a href="https://basescan.org/address/0xDC802747d6c5271e2fC8a51bc52D279bDb80b463">Factory on Basescan</a>
 </p>
 
@@ -120,4 +120,4 @@ Set `NEXT_PUBLIC_CHAIN_ID=84532` to run against Base Sepolia, with your own depl
 
 - App: https://keelfun.app
 - Docs: https://keelfun.app/docs/
-- X: https://x.com/Keelfunxyz
+- X: https://x.com/keelfunapp
