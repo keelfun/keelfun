@@ -28,6 +28,129 @@ const DEX: Record<string, string> = {
   "aero-slipstream-base": "Aero CL", "pancakeswap-v3-base": "Pancake", "sushiswap-v3-base": "Sushi", "baseswap": "BaseSwap",
 };
 
+const SETS_EVT = "keel-sets";
+function readSet(key: string): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "[]");
+  } catch {
+    return [];
+  }
+}
+function useSet(key: string) {
+  const [s, setS] = useState<string[]>([]);
+  useEffect(() => {
+    const f = () => setS(readSet(key));
+    f();
+    addEventListener(SETS_EVT, f);
+    addEventListener("storage", f);
+    return () => (removeEventListener(SETS_EVT, f), removeEventListener("storage", f));
+  }, [key]);
+  const toggle = (a: string) => {
+    const x = a.toLowerCase();
+    const cur = readSet(key);
+    localStorage.setItem(key, JSON.stringify(cur.includes(x) ? cur.filter((y) => y !== x) : [...cur, x]));
+    dispatchEvent(new Event(SETS_EVT));
+  };
+  return [s, toggle] as const;
+}
+const useWatch = () => useSet("keel-watch");
+const useHidden = () => useSet("keel-hidden");
+
+type Lane = { p: number | null; minLiq: number; minVol: number; minMc: number; maxAgeH: number; showHidden: boolean };
+const LANE0: Lane = { p: null, minLiq: 0, minVol: 0, minMc: 0, maxAgeH: 0, showHidden: false };
+function useLane(id: string) {
+  const key = `keel-lane-${id}`;
+  const [lane, setL] = useState<Lane>(LANE0);
+  useEffect(() => {
+    try {
+      setL({ ...LANE0, ...JSON.parse(localStorage.getItem(key) || "{}") });
+    } catch {}
+  }, [key]);
+  const set = (v: Partial<Lane>) =>
+    setL((cur) => {
+      const n = { ...cur, ...v };
+      localStorage.setItem(key, JSON.stringify(n));
+      return n;
+    });
+  return [lane, set] as const;
+}
+const laneActive = (l: Lane) => l.minLiq > 0 || l.minVol > 0 || l.minMc > 0 || l.maxAgeH > 0 || l.showHidden;
+function passLane(l: Lane, x: { liq: number; vol: number; mc: number; created: number }) {
+  if (x.liq < l.minLiq || x.vol < l.minVol || x.mc < l.minMc) return false;
+  if (l.maxAgeH > 0 && x.created && Date.now() / 1000 - (x.created > 1e12 ? x.created / 1000 : x.created) > l.maxAgeH * 3600) return false;
+  return true;
+}
+
+function LaneControls({ lane, set }: { lane: Lane; set: (v: Partial<Lane>) => void }) {
+  const [open, setOpen] = useState(false);
+  const num = (k: "minLiq" | "minVol" | "minMc" | "maxAgeH", label: string, unit: string) => (
+    <label className="flex items-center justify-between gap-2 text-xs">
+      <span className="text-muted">{label}</span>
+      <span className="flex w-28 items-center gap-1 rounded-md border border-line bg-bg px-1.5 py-1">
+        <input value={lane[k] || ""} onChange={(e) => set({ [k]: Number(e.target.value.replace(/[^0-9.]/g, "")) || 0 })} inputMode="decimal" placeholder="any" className="w-full bg-transparent font-mono outline-none" />
+        <span className="text-dim">{unit}</span>
+      </span>
+    </label>
+  );
+  return (
+    <div className="relative flex shrink-0 items-center gap-1">
+      <div className="flex rounded-md border border-line p-0.5" title="Quick buy preset for this column">
+        {[0, 1, 2].map((i) => (
+          <button key={i} onClick={() => set({ p: lane.p === i ? null : i })} className={`rounded px-1 font-mono text-[10px] ${lane.p === i ? "bg-panel-2 text-accent" : "text-dim hover:text-fg"}`}>
+            P{i + 1}
+          </button>
+        ))}
+      </div>
+      <button onClick={() => setOpen((v) => !v)} aria-label="Filters" className={`flex h-6 w-6 items-center justify-center rounded-md border ${laneActive(lane) ? "border-accent text-accent" : "border-line text-dim hover:text-fg"}`}>
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 5h18l-7 8v6l-4 2v-8z" /></svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-8 z-40 w-60 space-y-2 rounded-xl border border-line bg-panel p-3 shadow-2xl">
+          <p className="text-xs font-semibold">Filters</p>
+          {num("minLiq", "Min liquidity", "$")}
+          {num("minVol", "Min volume 24h", "$")}
+          {num("minMc", "Min market cap", "$")}
+          {num("maxAgeH", "Max age", "h")}
+          <label className="flex items-center justify-between text-xs">
+            <span className="text-muted">Show hidden pairs</span>
+            <input type="checkbox" checked={lane.showHidden} onChange={(e) => set({ showHidden: e.target.checked })} className="accent-[var(--accent)]" />
+          </label>
+          <div className="flex justify-between pt-1">
+            <button onClick={() => set(LANE0)} className="text-xs text-dim hover:text-fg">Reset</button>
+            <button onClick={() => setOpen(false)} className="rounded-md bg-panel-2 px-2 py-0.5 text-xs">Done</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RowTools({ address, symbol }: { address: string; symbol: string }) {
+  const [watch, toggleWatch] = useWatch();
+  const [hidden, toggleHidden] = useHidden();
+  const a = address.toLowerCase();
+  const on = watch.includes(a);
+  const off = hidden.includes(a);
+  const stop = (f: () => void) => (e: React.MouseEvent) => (e.preventDefault(), e.stopPropagation(), f());
+  const ext = (href: string, title: string, icon: React.ReactNode) => (
+    <a href={href} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-dim hover:text-fg" title={title}>
+      {icon}
+    </a>
+  );
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button onClick={stop(() => toggleWatch(a))} className={on ? "text-warn" : "text-dim hover:text-fg"} title={on ? "Remove from watchlist" : "Add to watchlist"} aria-label="Watchlist">
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill={on ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z" /></svg>
+      </button>
+      {ext(`https://x.com/search?q=${encodeURIComponent(`$${symbol} OR ${address}`)}&f=live`, "Search on X", <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor"><path d="M18.2 2.3h3.4l-7.4 8.4 8.7 11.5h-6.8l-5.3-7-6.1 7H1.3l7.9-9L.8 2.3h7l4.8 6.4zm-1.2 17.9h1.9L7 4.2H5z" /></svg>)}
+      {ext(`https://basescan.org/token/${address}`, "Basescan", <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6" /><path d="m20 20-4.5-4.5" /></svg>)}
+      <button onClick={stop(() => toggleHidden(a))} className={off ? "text-down" : "text-dim hover:text-fg"} title={off ? "Unhide pair" : "Hide pair"} aria-label="Hide">
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 3l18 18M10.6 6.1A10 10 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3 3.7M6.6 6.6A17 17 0 0 0 2.5 12S6 18 12 18a9 9 0 0 0 4.4-1.1" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>
+      </button>
+    </span>
+  );
+}
+
 function Row({ t, ethUsd, amount, buy }: { t: Token; ethUsd: number; amount: string; buy: (t: Token, a: string) => Promise<void> }) {
   const pair = pairInfo(t.pair);
   const native = pair.symbol === "ETH";
@@ -80,6 +203,7 @@ function Row({ t, ethUsd, amount, buy }: { t: Token; ethUsd: number; amount: str
               {t.holders}
             </span>
             {t.antiSnipe && <span className="text-[10px] text-warn">anti-snipe</span>}
+            <RowTools address={t.address} symbol={t.symbol} />
             <button
               onClick={native ? go : undefined}
               className={`ml-auto flex h-8 shrink-0 items-center gap-1 rounded-lg border px-3 font-mono text-xs font-semibold ${
@@ -113,9 +237,26 @@ function Row({ t, ethUsd, amount, buy }: { t: Token; ethUsd: number; amount: str
   );
 }
 
-function Column({ sort, title, amount, buy, hidden }: { sort: string; title: string; amount: string; buy: (t: Token, a: string) => Promise<void>; hidden: boolean }) {
+type ColProps<T> = { sort: string; title: string; buy: (x: T, a: string, p: number | null) => Promise<void>; hidden: boolean; view: "all" | "watch" };
+function useLaneAmount(lane: Lane) {
+  const { prefs, preset } = usePrefs();
+  return lane.p == null ? preset.amount : prefs.presets[lane.p].amount;
+}
+
+function Column({ sort, title, buy, hidden, view }: ColProps<Token>) {
   const [q, setQ] = useState("");
   const { data, isLoading } = useTokens(sort, q);
+  const [lane, setLane] = useLane(`k-${sort}`);
+  const amount = useLaneAmount(lane);
+  const [watch] = useWatch();
+  const [hid] = useHidden();
+  const ethUsd = data?.ethUsd ?? 0;
+  const list = data?.tokens.filter((t) => {
+    const a = t.address.toLowerCase();
+    if (view === "watch" && !watch.includes(a)) return false;
+    if (!lane.showHidden && hid.includes(a)) return false;
+    return passLane(lane, { liq: t.liquidityEth * ethUsd, vol: t.volume24hEth * ethUsd, mc: t.fdvEth * ethUsd, created: t.createdAt });
+  });
   return (
     <section className={`${hidden ? "hidden lg:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-line lg:border-r`}>
       <div className="flex items-center gap-2 border-b border-line px-3 py-2">
@@ -125,13 +266,14 @@ function Column({ sort, title, amount, buy, hidden }: { sort: string; title: str
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search"
-          className="ml-auto h-7 w-28 min-w-0 rounded-md border border-line bg-bg px-2 text-xs outline-none focus:border-accent"
+          className="ml-auto h-7 w-24 min-w-0 rounded-md border border-line bg-bg px-2 text-xs outline-none focus:border-accent"
         />
+        <LaneControls lane={lane} set={setLane} />
       </div>
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
-        {data?.tokens.map((t) => <Row key={t.address} t={t} ethUsd={data.ethUsd} amount={amount} buy={buy} />)}
+        {list?.map((t) => <Row key={t.address} t={t} ethUsd={ethUsd} amount={amount} buy={(x, a) => buy(x, a, lane.p)} />)}
         {isLoading && <p className="p-6 text-center text-xs text-dim">Loading…</p>}
-        {data && data.tokens.length === 0 && <p className="p-6 text-center text-xs text-dim">No tokens yet.</p>}
+        {list && list.length === 0 && <p className="p-6 text-center text-xs text-dim">{view === "watch" ? "No watchlisted tokens here. Tap ☆ on a row." : "No tokens match."}</p>}
       </div>
     </section>
   );
@@ -200,6 +342,7 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
             >
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 3v18h18" /><path d="m7 14 4-4 3 3 5-6" /></svg>
             </a>
+            <RowTools address={t.address} symbol={t.symbol} />
             <button
               onClick={go}
               className={`ml-auto flex h-8 shrink-0 items-center gap-1 rounded-lg border px-3 font-mono text-xs font-semibold ${
@@ -230,8 +373,12 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
   );
 }
 
-function BaseColumn({ sort, title, amount, buy, hidden }: { sort: string; title: string; amount: string; buy: (p: BasePool, a: string) => Promise<void>; hidden: boolean }) {
+function BaseColumn({ sort, title, buy, hidden, view }: ColProps<BasePool>) {
   const [q, setQ] = useState("");
+  const [lane, setLane] = useLane(`b-${sort}`);
+  const amount = useLaneAmount(lane);
+  const [watch] = useWatch();
+  const [hid] = useHidden();
   const [dq, setDq] = useState("");
   useEffect(() => {
     const t = setTimeout(() => setDq(q.trim()), 400);
@@ -245,6 +392,12 @@ function BaseColumn({ sort, title, amount, buy, hidden }: { sort: string; title:
     retryDelay: (n) => 2000 * (n + 1),
     staleTime: 15000,
   });
+  const list = data?.pools.filter((p) => {
+    const a = p.token.address.toLowerCase();
+    if (view === "watch" && !watch.includes(a)) return false;
+    if (!lane.showHidden && hid.includes(a)) return false;
+    return passLane(lane, { liq: p.liqUsd, vol: p.vol24, mc: p.mcUsd, created: p.createdAt });
+  });
   return (
     <section className={`${hidden ? "hidden lg:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-line lg:border-r`}>
       <div className="flex items-center gap-2 border-b border-line px-3 py-2">
@@ -254,14 +407,15 @@ function BaseColumn({ sort, title, amount, buy, hidden }: { sort: string; title:
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search Base"
-          className="ml-auto h-7 w-32 min-w-0 rounded-md border border-line bg-bg px-2 text-xs outline-none focus:border-accent"
+          className="ml-auto h-7 w-24 min-w-0 rounded-md border border-line bg-bg px-2 text-xs outline-none focus:border-accent"
         />
+        <LaneControls lane={lane} set={setLane} />
       </div>
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
-        {data?.pools.map((p) => <BaseRow key={p.pool} p={p} amount={amount} buy={buy} />)}
+        {list?.map((p) => <BaseRow key={p.pool} p={p} amount={amount} buy={(x, a) => buy(x, a, lane.p)} />)}
         {isLoading && <p className="p-6 text-center text-xs text-dim">Loading Base pairs…</p>}
         {error && !data && <p className="p-6 text-center text-xs text-dim">{(error as Error).message}</p>}
-        {data && data.pools.length === 0 && <p className="p-6 text-center text-xs text-dim">No pairs found.</p>}
+        {list && list.length === 0 && <p className="p-6 text-center text-xs text-dim">{view === "watch" ? "No watchlisted pairs here. Tap ☆ on a row." : "No pairs match."}</p>}
       </div>
     </section>
   );
@@ -342,12 +496,19 @@ export default function TerminalPage() {
   const [tab, setTab] = useState(0);
   const [tracker, setTracker] = useState(true);
   const [src, setSrc] = useState<"base" | "keel">("base");
-  const { preset } = usePrefs();
-  const amount = preset.amount;
+  const [view, setView] = useState<"all" | "watch">("all");
+  const [watch] = useWatch();
+  const { prefs, preset } = usePrefs();
   const keelBuy = useKeelBuy();
   const relay = useRelayBuy();
-  const buy = (t: Token, a: string) => keelBuy(t, { ...preset, amount: a });
-  const relayBuy = (p: BasePool, a: string) => relay(p, { ...preset, amount: a });
+  const pick = (p: number | null) => (p == null ? preset : prefs.presets[p]);
+  const buy = (t: Token, a: string, p: number | null) => keelBuy(t, { ...pick(p), amount: a });
+  const relayBuy = (x: BasePool, a: string, p: number | null) => relay(x, { ...pick(p), amount: a });
+  useEffect(() => {
+    const f = () => setTracker((v) => !v);
+    addEventListener("keel-tracker", f);
+    return () => removeEventListener("keel-tracker", f);
+  }, []);
   const cols = src === "base" ? BASE_COLS : COLS;
   return (
     <div className="relative left-1/2 -mb-20 flex h-[calc(100dvh-6.5rem)] w-screen -translate-x-1/2 flex-col border-t border-line lg:h-[calc(100dvh-3.5rem)]">
@@ -355,11 +516,16 @@ export default function TerminalPage() {
         {!tracker && (
           <button onClick={() => setTracker(true)} className="hidden h-8 rounded-md border border-line px-2 text-xs text-muted hover:text-fg xl:block">Wallet tracker</button>
         )}
-        <h1 className="text-base font-bold italic">Terminal</h1>
+        <h1 className="text-base font-bold italic">Pulse</h1>
         <span className="flex items-center gap-1.5 text-xs text-up"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />live</span>
         <div className="flex rounded-lg border border-line p-0.5 text-xs">
           {([["base", "All Base"], ["keel", "Keelfun"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setSrc(k)} className={`rounded-md px-2.5 py-1 ${src === k ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}>{l}</button>
+          ))}
+        </div>
+        <div className="flex rounded-lg border border-line p-0.5 text-xs">
+          {([["all", "All"], ["watch", `★ ${watch.length}`]] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setView(k)} className={`rounded-md px-2.5 py-1 ${view === k ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}>{l}</button>
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -376,8 +542,8 @@ export default function TerminalPage() {
       <div className="flex min-h-0 flex-1">
         {tracker && <Tracker onClose={() => setTracker(false)} />}
         {src === "base"
-          ? BASE_COLS.map((c, i) => <BaseColumn key={`b${c.sort}`} sort={c.sort} title={c.title} amount={amount} buy={relayBuy} hidden={tab !== i} />)
-          : COLS.map((c, i) => <Column key={c.sort} sort={c.sort} title={c.title} amount={amount} buy={buy} hidden={tab !== i} />)}
+          ? BASE_COLS.map((c, i) => <BaseColumn key={`b${c.sort}`} sort={c.sort} title={c.title} buy={relayBuy} hidden={tab !== i} view={view} />)
+          : COLS.map((c, i) => <Column key={c.sort} sort={c.sort} title={c.title} buy={buy} hidden={tab !== i} view={view} />)}
       </div>
     </div>
   );

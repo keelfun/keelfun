@@ -25,6 +25,8 @@ export function SearchK({ wide = false }: { wide?: boolean }) {
       } else if (e.key === "Escape") setOpen(false);
     };
     addEventListener("keydown", k);
+    const o = () => setOpen(true);
+    addEventListener("keel-search", o);
     return () => removeEventListener("keydown", k);
   }, []);
   useEffect(() => {
