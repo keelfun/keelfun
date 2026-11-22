@@ -194,6 +194,7 @@ function Row({ t, ethUsd, amount, buy }: { t: Token; ethUsd: number; amount: str
             <span className="ml-auto shrink-0 text-xs text-muted">MC <b className="text-sm text-fg">{usd(t.fdvEth)}</b></span>
           </div>
           <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+            <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap [&>*]:shrink-0">
             <span className="text-up">{timeAgo(t.createdAt)}</span>
             <span className="inline-flex items-center gap-1 rounded-full border border-line px-1.5 py-px text-[10px]">
               <img src={pair.logo} alt="" className="h-3 w-3 rounded-full" />
@@ -205,9 +206,10 @@ function Row({ t, ethUsd, amount, buy }: { t: Token; ethUsd: number; amount: str
             </span>
             {t.antiSnipe && <span className="text-[10px] text-warn">anti-snipe</span>}
             <RowTools address={t.address} symbol={t.symbol} />
+            </div>
             <button
               onClick={native ? go : undefined}
-              className={`ml-auto flex h-8 shrink-0 items-center gap-1 rounded-lg border px-3 font-mono text-xs font-semibold ${
+              className={`flex h-8 shrink-0 items-center gap-1 rounded-lg border px-3 font-mono text-xs font-semibold ${
                 state === "ok" ? "border-up bg-up/20 text-up" : state && state !== "busy" ? "border-down/60 text-down" : "border-up/50 bg-up/10 text-up hover:bg-up/20"
               }`}
               title={native ? `Quick buy ${amount} ETH` : `Open to buy with ${pair.symbol}`}
@@ -327,6 +329,7 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
             <span className="ml-auto shrink-0 text-xs text-muted">MC <b className="text-sm text-fg">{fmtUsd(p.mcUsd)}</b></span>
           </div>
           <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+            <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap [&>*]:shrink-0">
             <span className="text-up">{p.createdAt ? timeAgo(p.createdAt) : "—"}</span>
             <span className="rounded-full border border-line px-1.5 py-px text-[10px]">/{p.quote}</span>
             {lp && <LaunchpadChip id={lp} />}
@@ -345,9 +348,10 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 3v18h18" /><path d="m7 14 4-4 3 3 5-6" /></svg>
             </a>
             <RowTools address={t.address} symbol={t.symbol} />
+            </div>
             <button
               onClick={go}
-              className={`ml-auto flex h-8 shrink-0 items-center gap-1 rounded-lg border px-3 font-mono text-xs font-semibold ${
+              className={`flex h-8 shrink-0 items-center gap-1 rounded-lg border px-3 font-mono text-xs font-semibold ${
                 state === "ok" ? "border-up bg-up/20 text-up" : state && state !== "busy" ? "border-down/60 text-down" : "border-up/50 bg-up/10 text-up hover:bg-up/20"
               }`}
               title={`Quick buy ${amount} ETH via Relay`}

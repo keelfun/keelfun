@@ -94,15 +94,15 @@ export default function TrendingPage() {
         </div>
       </div>
       <div className="overflow-x-auto rounded-2xl border border-line bg-panel">
-        <table className="w-full min-w-[860px] text-sm">
+        <table className="w-full sm:min-w-[860px] text-sm">
           <thead className="border-b border-line">
             <tr>
               <th className={th}>Pair info</th>
-              <th className={th}>Chart</th>
+              <th className={`${th} hidden sm:table-cell`}>Chart</th>
               <th className={`${th} text-right`}>Market cap</th>
-              <th className={`${th} text-right`}>Liquidity</th>
-              <th className={`${th} text-right`}>Volume</th>
-              <th className={`${th} text-right`}>TXNS</th>
+              <th className={`${th} text-right hidden sm:table-cell`}>Liquidity</th>
+              <th className={`${th} text-right hidden sm:table-cell`}>Volume</th>
+              <th className={`${th} text-right hidden sm:table-cell`}>TXNS</th>
               <th className={`${th} text-right`}>Action</th>
             </tr>
           </thead>
@@ -110,22 +110,22 @@ export default function TrendingPage() {
             {data?.map((p) => (
               <tr key={p.pool} className="border-b border-line/60 last:border-0 hover:bg-panel-2/50">
                 <td className="px-3 py-2.5">
-                  <Link href={`/pair/?p=${p.pool}`} className="flex items-center gap-3">
+                  <Link href={`/pair/?p=${p.pool}`} className="flex items-center gap-2 sm:gap-3">
                     <PoolAvatar token={p.token} dex={p.dex} dexLabel={DEX_LABEL[p.dex] ?? p.dex.replace(/-base$/, "").slice(0, 8)} size={44} />
-                    <div className="min-w-0">
-                      <p className="truncate"><b>{p.token.symbol}</b> <span className="text-xs text-dim">{p.token.name}</span></p>
-                      <p className="text-xs text-muted"><span className="text-up">{p.createdAt ? timeAgo(p.createdAt) : "—"}</span> · /{p.quote} <Lp p={p} /></p>
+                    <div className="min-w-0 max-w-[8.5rem] sm:max-w-none">
+                      <p className="truncate"><b>{p.token.symbol}</b> <span className="hidden text-xs text-dim sm:inline">{p.token.name}</span></p>
+                      <p className="truncate text-xs text-muted"><span className="text-up">{p.createdAt ? timeAgo(p.createdAt) : "—"}</span> · /{p.quote} <Lp p={p} /></p>
                     </div>
                   </Link>
                 </td>
-                <td className="px-3 py-2.5"><Spark p={p} /></td>
+                <td className="px-3 py-2.5 hidden sm:table-cell"><Spark p={p} /></td>
                 <td className="px-3 py-2.5 text-right font-mono">
                   <p>{fmtUsd(p.mcUsd)}</p>
                   <p className={`text-xs ${p.chg24 >= 0 ? "text-up" : "text-down"}`}>{p.chg24 >= 0 ? "+" : ""}{p.chg24.toFixed(2)}%</p>
                 </td>
-                <td className="px-3 py-2.5 text-right font-mono">{fmtUsd(p.liqUsd)}</td>
-                <td className="px-3 py-2.5 text-right font-mono">{fmtUsd(p.vol24)}</td>
-                <td className="px-3 py-2.5 text-right font-mono">
+                <td className="px-3 py-2.5 text-right font-mono hidden sm:table-cell">{fmtUsd(p.liqUsd)}</td>
+                <td className="px-3 py-2.5 text-right font-mono hidden sm:table-cell">{fmtUsd(p.vol24)}</td>
+                <td className="px-3 py-2.5 text-right font-mono hidden sm:table-cell">
                   <p>{fmtCompact(p.buys + p.sells, 1)}</p>
                   <p className="text-xs"><span className="text-up">{fmtCompact(p.buys, 1)}</span> / <span className="text-down">{fmtCompact(p.sells, 1)}</span></p>
                 </td>

@@ -99,15 +99,15 @@ export default function ChainPage() {
             <p className="text-xs text-dim">USD traded on each DEX</p>
           </div>
         </div>
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full sm:min-w-[640px] text-sm">
           <thead className="border-b border-line">
             <tr>
               <th className={`${th} !text-left`}>DEX</th>
               <th className={th}>24h</th>
               <th className={th}>7d</th>
-              <th className={th}>30d</th>
-              <th className={th}>Change, 1d</th>
-              <th className={th}>Share, 24h</th>
+              <th className={`${th} hidden sm:table-cell`}>30d</th>
+              <th className={`${th} hidden sm:table-cell`}>Change, 1d</th>
+              <th className={`${th} hidden sm:table-cell`}>Share, 24h</th>
             </tr>
           </thead>
           <tbody className="font-mono">
@@ -123,9 +123,9 @@ export default function ChainPage() {
                   </td>
                   <td className="px-3 py-2.5 text-right">{fmtUsd(p.total24h ?? 0)}</td>
                   <td className="px-3 py-2.5 text-right">{fmtUsd(p.total7d ?? 0)}</td>
-                  <td className="px-3 py-2.5 text-right">{fmtUsd(p.total30d ?? 0)}</td>
-                  <td className={`px-3 py-2.5 text-right ${(p.change_1d ?? 0) >= 0 ? "text-up" : "text-down"}`}>{p.change_1d != null ? `${p.change_1d >= 0 ? "+" : ""}${p.change_1d.toFixed(1)}%` : "—"}</td>
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="px-3 py-2.5 text-right hidden sm:table-cell">{fmtUsd(p.total30d ?? 0)}</td>
+                  <td className={`px-3 py-2.5 text-right hidden sm:table-cell ${(p.change_1d ?? 0) >= 0 ? "text-up" : "text-down"}`}>{p.change_1d != null ? `${p.change_1d >= 0 ? "+" : ""}${p.change_1d.toFixed(1)}%` : "—"}</td>
+                  <td className="px-3 py-2.5 text-right hidden sm:table-cell">
                     <span className="inline-flex items-center gap-2">
                       <span className="h-1.5 w-16 overflow-hidden rounded-full bg-panel-2"><span className="block h-full bg-accent" style={{ width: `${Math.min(100, share * 100)}%` }} /></span>
                       {(share * 100).toFixed(1)}%

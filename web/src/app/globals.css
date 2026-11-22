@@ -183,3 +183,6 @@ input[type="number"] {
   --color-accent-soft: #ffc9c2;
   --color-accent-ink: #ffffff;
 }
+
+html[data-term] .site-footer { display: none; }
+html[data-term] .term-footer { display: flex; }

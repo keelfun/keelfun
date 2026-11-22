@@ -159,7 +159,7 @@ function WalletBar({ current }: { current: string }) {
         </span>
       ))}
       <form onSubmit={(e) => (e.preventDefault(), add())} className="flex h-8 items-center rounded-lg border border-line bg-bg/60 pl-2.5">
-        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Watch any address 0x…" className="w-44 bg-transparent font-mono text-xs outline-none placeholder:text-dim" />
+        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Watch any address 0x…" className="w-52 sm:w-72 bg-transparent font-mono text-xs outline-none placeholder:text-dim" />
         <button disabled={!isAddress(input.trim())} className="px-2.5 text-xs text-accent disabled:text-dim">+ Watch</button>
       </form>
     </div>

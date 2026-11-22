@@ -27,6 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+        <script dangerouslySetInnerHTML={{ __html: `if(location.hostname.indexOf("terminal.")===0)document.documentElement.setAttribute("data-term","")` }} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${serif.variable} flex min-h-dvh flex-col overflow-x-clip antialiased lg:pb-8`}>
         <Providers>
