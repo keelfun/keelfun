@@ -1,4 +1,5 @@
 "use client";
+import { BuildOnBaseCta } from "@/components/BuiltOnBase";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { TokenCard } from "@/components/TokenCard";
@@ -216,6 +217,7 @@ export default function Home() {
           </Link>
         </div>
       </section>
+      <BuildOnBaseCta />
     </div>
   );
 }
