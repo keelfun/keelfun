@@ -31,7 +31,7 @@ export default {
     const res = await stub(env).fetch(req);
     const headers = new Headers(res.headers);
     for (const [k, v] of Object.entries(CORS)) headers.set(k, v);
-    headers.set("x-keel-build", "2");
+    headers.set("x-keel-build", "3");
     return new Response(res.body, { status: res.status, headers });
   },
   async scheduled(_event: ScheduledController, env: Env): Promise<void> {

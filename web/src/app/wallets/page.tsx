@@ -6,8 +6,9 @@ import { chain, EXPLORER } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
 import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
 import {
-  createVault, deleteVault, exportBackup, lock, restoreBackup, unlock, useVault, vaultActions, vaultClient, vaultMessage, vaultPublic, type TokenMeta, type VaultAct, type VaultWallet,
+  createVault, deleteVault, exportBackup, lock, restoreBackup, restoreRaw, storedRaw, vaultCloudMessage, unlock, useVault, vaultActions, vaultClient, vaultMessage, vaultPublic, type TokenMeta, type VaultAct, type VaultWallet,
 } from "@/lib/vault";
+import { api } from "@/lib/api";
 import { useVaultHoldings, vaultSell, type Holding } from "@/lib/vaultHoldings";
 import { TokenAvatar } from "@/components/TokenAvatar";
 
@@ -167,6 +168,7 @@ export default function WalletsPage() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [imp, setImp] = useState("");
+  const [note, setNote] = useState("");
   const file = useRef<HTMLInputElement>(null);
   const act = async (f: () => Promise<unknown>) => {
     setErr("");
@@ -192,6 +194,20 @@ export default function WalletsPage() {
       if (pw.length < 8) throw new Error("Use at least 8 characters");
       if (pw !== pw2) throw new Error("Passwords don't match");
       await createVault("password", pw);
+    });
+  const cloud = (op: "save" | "load") =>
+    act(async () => {
+      const owner = (await ensure()).toLowerCase();
+      if (op === "load" && v.exists && !confirm2("Replace the vault in this browser with your cloud backup?")) return;
+      const ts = Math.floor(Date.now() / 1000);
+      const signature = await signMessageAsync({ message: vaultCloudMessage(op === "save" ? "backup" : "restore", owner, ts) });
+      const r = await api<{ blob?: string; ok?: boolean }>(`/vault/${op}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ owner, ts, signature, blob: op === "save" ? storedRaw() : undefined }),
+      });
+      if (op === "load" && r.blob) await restoreRaw(r.blob);
+      setNote(op === "save" ? "Saved. Restore it on any device or on keelfun.app / terminal.keelfun.app with the same wallet." : "Restored. Unlock it with the same signature or password.");
     });
   const d = v.data;
 
@@ -219,11 +235,12 @@ export default function WalletsPage() {
           )}
           <ul className="space-y-1.5 text-xs text-dim">
             <li>✓ Keys are generated and encrypted in your browser. Keelfun servers never see a key or the signature that unlocks it.</li>
-            <li>✓ Download an encrypted backup to restore the vault on another device.</li>
+            <li>✓ Download an encrypted backup, or save it to the cloud (still encrypted, only your wallet can fetch it) to restore on another device.</li>
             <li>✓ The vault locks itself after an hour of inactivity.</li>
           </ul>
           <div className="flex flex-wrap gap-4 text-sm">
             <button onClick={() => file.current?.click()} className="text-muted underline-offset-4 hover:text-fg hover:underline">Restore from an encrypted file</button>
+            <button onClick={() => cloud("load")} disabled={busy} className="text-muted underline-offset-4 hover:text-fg hover:underline">Restore from cloud</button>
             {v.exists && <button onClick={() => confirm2("Delete the vault from this browser? Without a backup the keys are lost.") && deleteVault()} className="text-down/80 hover:text-down">Delete vault on this device</button>}
           </div>
           <input ref={file} type="file" accept="application/json,.json" className="hidden" onChange={(e) => e.target.files?.[0] && act(() => restoreBackup(e.target.files![0]))} />
@@ -235,6 +252,7 @@ export default function WalletsPage() {
             <div className="ml-auto flex flex-wrap gap-2">
               <button onClick={() => act(vaultActions.add)} className="h-8 rounded-lg bg-accent px-3 text-xs font-semibold text-accent-ink">+ New wallet</button>
               <button onClick={() => act(async () => exportBackup())} className="h-8 rounded-lg border border-line px-3 text-xs text-muted hover:text-fg">Download backup</button>
+              <button onClick={() => cloud("save")} disabled={busy} className="h-8 rounded-lg border border-line px-3 text-xs text-muted hover:text-fg">Save to cloud</button>
               <button onClick={lock} className="h-8 rounded-lg border border-line px-3 text-xs text-muted hover:text-fg">Lock</button>
             </div>
           </div>
@@ -257,6 +275,7 @@ export default function WalletsPage() {
           <p className="text-xs leading-relaxed text-dim">Trading wallets are hot wallets kept in this browser. Only fund them with what you plan to trade, and keep a backup file somewhere safe. Clearing browser data without a backup loses the keys.</p>
         </div>
       )}
+      {note && !err && <p className="rounded-lg border border-up/40 bg-up/5 p-3 text-sm text-up">{note}</p>}
       {err && <p className="rounded-lg border border-down/40 bg-down/5 p-3 text-sm text-down">{err}</p>}
     </div>
   );

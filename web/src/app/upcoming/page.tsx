@@ -15,7 +15,7 @@ export type Scheduled = {
   website: string | null; x: string | null; telegram: string | null; launch_at: number; created: number; token: string | null;
 };
 
-export const scheduleMessage = (symbol: string, at: number, creator: string) =>
+const scheduleMessage = (symbol: string, at: number, creator: string) =>
   `Keelfun scheduled launch\nTicker: $${symbol}\nTime: ${new Date(at * 1000).toISOString()}\nCreator: ${creator.toLowerCase()}`;
 
 function useNow() {

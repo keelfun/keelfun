@@ -202,6 +202,7 @@ export class Indexer extends DurableObject<Env> {
         code TEXT PRIMARY KEY, name TEXT, url TEXT, kind TEXT, description TEXT, payout TEXT, signature TEXT,
         approved INTEGER DEFAULT 0, created INTEGER
       );
+      CREATE TABLE IF NOT EXISTS vaults (owner TEXT PRIMARY KEY, blob TEXT, updated INTEGER);
       CREATE TABLE IF NOT EXISTS scheduled (
         id TEXT PRIMARY KEY, creator TEXT, name TEXT, symbol TEXT, description TEXT, image TEXT, pair TEXT,
         website TEXT, x TEXT, telegram TEXT, launch_at INTEGER, created INTEGER, signature TEXT
@@ -540,6 +541,7 @@ export class Indexer extends DurableObject<Env> {
         if (parts[0] === "metadata") return await this.saveMetadata(req, url);
         if (parts[0] === "builders") return await this.registerBuilder(req);
         if (parts[0] === "scheduled") return await this.schedule(req);
+        if (parts[0] === "vault") return await this.vault(req, parts[1]);
         return json({ error: "not found" }, 404);
       }
       switch (parts[0]) {
@@ -1000,6 +1002,26 @@ export class Indexer extends DurableObject<Env> {
     };
   }
 
+  private async vault(req: Request, op?: string) {
+    const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!b || (op !== "save" && op !== "load")) return json({ error: "bad request" }, 400);
+    const owner = lc(String(b.owner ?? ""));
+    const ts = Math.floor(Number(b.ts));
+    if (!/^0x[0-9a-f]{40}$/.test(owner)) return json({ error: "Invalid owner" }, 400);
+    if (!(Math.abs(Date.now() / 1000 - ts) < 600)) return json({ error: "Signature expired, try again" }, 400);
+    const ok = await verifyMessage({ address: owner as `0x${string}`, message: vaultCloudMessage(op === "save" ? "backup" : "restore", owner, ts), signature: String(b.signature ?? "").slice(0, 300) as `0x${string}` }).catch(() => false);
+    if (!ok) return json({ error: "Signature doesn't match the wallet" }, 400);
+    if (op === "load") {
+      const r = this.sql.exec("SELECT blob, updated FROM vaults WHERE owner = ?", owner).toArray()[0];
+      return r ? json({ blob: String(r.blob), updated: Number(r.updated) }) : json({ error: "No cloud backup for this wallet" }, 404);
+    }
+    const blob = String(b.blob ?? "");
+    const v = safeParse(blob) as Record<string, unknown> | null;
+    if (blob.length > 300_000 || !v || v.v !== 1 || !v.ct || !v.iv || !v.salt) return json({ error: "Invalid vault" }, 400);
+    this.sql.exec("INSERT INTO vaults (owner, blob, updated) VALUES (?, ?, ?) ON CONFLICT(owner) DO UPDATE SET blob = excluded.blob, updated = excluded.updated", owner, blob, Date.now());
+    return json({ ok: true });
+  }
+
   private scheduled(id?: string) {
     const now = Math.floor(Date.now() / 1000);
     const rows = id
@@ -1127,6 +1149,10 @@ function safeParseArr(s: string): unknown[] {
 
 const BUILDER_CODE = /^[a-z0-9-]{3,24}$/;
 const BUILDER_SHARE = 0.25;
+
+export function vaultCloudMessage(kind: "backup" | "restore", owner: string, ts: number) {
+  return `Keelfun vault ${kind}\nOwner: ${owner.toLowerCase()}\nTime: ${ts}\nThe vault stays encrypted. Keelfun cannot read your keys.`;
+}
 
 export function scheduleMessage(symbol: string, at: number, creator: string) {
   return `Keelfun scheduled launch\nTicker: $${symbol}\nTime: ${new Date(at * 1000).toISOString()}\nCreator: ${creator.toLowerCase()}`;

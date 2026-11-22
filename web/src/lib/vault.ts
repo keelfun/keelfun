@@ -157,8 +157,17 @@ export function exportBackup() {
   a.click();
 }
 
+export const vaultCloudMessage = (kind: "backup" | "restore", owner: string, ts: number) =>
+  `Keelfun vault ${kind}\nOwner: ${owner.toLowerCase()}\nTime: ${ts}\nThe vault stays encrypted. Keelfun cannot read your keys.`;
+
+export const storedRaw = () => localStorage.getItem(KEY);
+
 export async function restoreBackup(f: File) {
-  const s = JSON.parse(await f.text());
+  return restoreRaw(await f.text());
+}
+
+export async function restoreRaw(raw: string) {
+  const s = JSON.parse(raw);
   if (s?.v !== 1 || !s.ct || !s.salt || !s.iv) throw new Error("Not a Keelfun vault backup");
   lock();
   localStorage.setItem(KEY, JSON.stringify(s));
