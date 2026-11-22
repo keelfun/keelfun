@@ -64,9 +64,26 @@ export function Bolt({ className = "h-3.5 w-3.5" }: { className?: string }) {
 export function PresetBar({ compact = false }: { compact?: boolean }) {
   const { prefs, preset, setActive, setPreset, sellPct, setSell } = usePrefs();
   const [open, setOpen] = useState(false);
+  const v = useVault();
+  const grp = v.data ? (v.data.groups[prefs.active] ?? []).length || v.data.wallets.length : 0;
   return (
-    <div className="relative flex items-center gap-1.5">
+    <div className="relative flex flex-wrap items-center gap-1.5">
       {!compact && <span className="hidden text-xs text-muted sm:inline">Quick buy</span>}
+      {!compact && (
+        <div className="flex rounded-lg border border-line p-0.5" title={v.data ? "Split the amount across wallets, or buy the full amount with each" : "Unlock the vault to choose wallets"}>
+          {(["total", "each"] as const).map((m) => (
+            <button key={m} disabled={!v.data} onClick={() => vaultActions.setMode(m)} className={`rounded-md px-2 py-0.5 text-[11px] capitalize ${(v.data?.mode ?? "total") === m ? "bg-panel-2 text-fg" : "text-dim hover:text-fg"} disabled:cursor-not-allowed`}>
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
+      {!compact && (
+        <Link href="/wallets/" title={v.data ? `${grp} wallet(s) in P${prefs.active + 1}` : "Unlock the vault to choose wallets"} className="flex h-8 items-center gap-1 rounded-lg border border-line px-2 font-mono text-[11px] text-muted hover:text-fg">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="11" width="14" height="10" rx="2" /><path d={v.data ? "M8 11V7a4 4 0 0 1 7.5-2" : "M8 11V7a4 4 0 0 1 8 0v4"} /></svg>
+          {v.data ? grp : "—"}
+        </Link>
+      )}
       <label className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-bg px-2 focus-within:border-accent">
         <Bolt className="h-3.5 w-3.5 text-up" />
         <input

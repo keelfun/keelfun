@@ -10,7 +10,7 @@ import { fmtUsd, shortAddr } from "@/lib/format";
 
 type Item = { key: string; href: string; img: string | null; title: string; sub: string; right?: string; tag: string };
 
-export function SearchK() {
+export function SearchK({ wide = false }: { wide?: boolean }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [dq, setDq] = useState("");
@@ -53,10 +53,10 @@ export function SearchK() {
   };
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex h-9 items-center gap-2 rounded-lg border border-line px-2.5 text-xs text-muted hover:text-fg" aria-label="Search">
+      <button onClick={() => setOpen(true)} className={`flex h-9 items-center gap-2 rounded-lg border border-line px-2.5 text-xs text-muted hover:text-fg ${wide ? "md:w-44 xl:w-56" : ""}`} aria-label="Search">
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-        <span className="hidden 2xl:inline">Search</span>
-        <kbd className="hidden rounded border border-line px-1 font-mono text-[10px] 2xl:inline">Ctrl K</kbd>
+        <span className={`hidden ${wide ? "md:inline" : "2xl:inline"}`}>Search</span>
+        <kbd className={`ml-auto hidden rounded border border-line px-1 font-mono text-[10px] ${wide ? "md:inline" : "2xl:inline"}`}>Ctrl K</kbd>
       </button>
       {open &&
         createPortal(

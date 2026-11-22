@@ -58,13 +58,15 @@ function BuyBtn({ p }: { p: BasePool }) {
 export default function TrendingPage() {
   const [dur, setDur] = useState<(typeof DUR)[number]>("1h");
   const [q, setQ] = useState("");
-  const { data, isLoading, error } = useQuery({
+  const [cjk, setCjk] = useState(false);
+  const { data: all, isLoading, error } = useQuery({
     queryKey: ["base-trending", dur, q.trim()],
     queryFn: () => fetchBasePools("trending", q.trim(), dur),
     refetchInterval: 30000,
     retry: 3,
     retryDelay: (n) => 2000 * (n + 1),
   });
+  const data = cjk ? all?.filter((p) => /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(p.token.name + p.token.symbol)) : all;
   const th = "px-3 py-2.5 text-left text-xs font-normal text-dim";
   return (
     <div className="space-y-4 py-6">
@@ -80,6 +82,7 @@ export default function TrendingPage() {
             <button key={d} onClick={() => setDur(d)} className={`rounded-md px-2.5 py-1 font-mono text-xs ${dur === d ? "bg-panel-2 text-fg" : "text-dim hover:text-fg"}`}>{d}</button>
           ))}
         </div>
+        <button onClick={() => setCjk((v) => !v)} className={`h-8 rounded-lg border px-2.5 text-xs ${cjk ? "border-accent text-accent" : "border-line text-muted hover:text-fg"}`}>中 Chinese names</button>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Base tokens" className="h-8 w-48 rounded-lg border border-line bg-bg px-3 text-xs outline-none focus:border-accent" />
         <div className="ml-auto">
           <PresetBar />
@@ -136,6 +139,7 @@ export default function TrendingPage() {
           </tbody>
         </table>
         {isLoading && <p className="p-8 text-center text-sm text-dim">Loading Base tokens…</p>}
+        {data && !data.length && !isLoading && <p className="p-8 text-center text-sm text-dim">No tokens match.</p>}
         {error && !data && <p className="p-8 text-center text-sm text-dim">{(error as Error).message}</p>}
       </div>
       <p className="text-xs text-dim">Data from GeckoTerminal. Anyone can create a token on Base, including copies of real names. Check the contract before buying.</p>

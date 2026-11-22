@@ -56,7 +56,7 @@ export default function TradersPage() {
   return (
     <div className="space-y-4 py-6">
       <div className="flex gap-5 border-b border-line text-sm">
-        <Link href="/trending/" className="pb-2.5 text-muted hover:text-fg">Tokens</Link>
+        <Link href="/discover/" className="pb-2.5 text-muted hover:text-fg">Tokens</Link>
         <span className="-mb-px border-b-2 border-fg pb-2.5">Traders</span>
       </div>
       <div className="flex flex-wrap items-center gap-3">
