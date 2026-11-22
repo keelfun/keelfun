@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { baseMeta, Bolt, PresetBar, RowSell, usePrefs, useRelayBuy } from "@/components/QuickBuy";
-import { TokenAvatar } from "@/components/TokenAvatar";
+import { LaunchpadChip, PoolAvatar, useLaunchpad } from "@/components/PoolAvatar";
 import { DEX_LABEL, fetchBasePools, type BasePool } from "@/lib/basePools";
 import { fmtCompact, fmtPrice, fmtUsd, timeAgo } from "@/lib/format";
 import { errMsg } from "@/lib/tx";
@@ -53,6 +53,11 @@ function BuyBtn({ p }: { p: BasePool }) {
       {s === "busy" ? "…" : s === "ok" ? "Bought" : s ? "Failed" : `${preset.amount} ETH`}
     </button>
   );
+}
+
+function Lp({ p }: { p: BasePool }) {
+  const lp = useLaunchpad(p.token.address, p.dex);
+  return lp ? <LaunchpadChip id={lp} /> : null;
 }
 
 export default function TrendingPage() {
@@ -106,13 +111,10 @@ export default function TrendingPage() {
               <tr key={p.pool} className="border-b border-line/60 last:border-0 hover:bg-panel-2/50">
                 <td className="px-3 py-2.5">
                   <Link href={`/pair/?p=${p.pool}`} className="flex items-center gap-3">
-                    <div className="relative">
-                      <TokenAvatar src={p.token.image} symbol={p.token.symbol} size={44} />
-                      <span className="absolute -bottom-1 -right-1 rounded bg-bg px-1 font-mono text-[9px] text-muted ring-1 ring-line">{DEX_LABEL[p.dex] ?? p.dex.replace(/-base$/, "").slice(0, 8)}</span>
-                    </div>
+                    <PoolAvatar token={p.token} dex={p.dex} dexLabel={DEX_LABEL[p.dex] ?? p.dex.replace(/-base$/, "").slice(0, 8)} size={44} />
                     <div className="min-w-0">
                       <p className="truncate"><b>{p.token.symbol}</b> <span className="text-xs text-dim">{p.token.name}</span></p>
-                      <p className="text-xs text-muted"><span className="text-up">{p.createdAt ? timeAgo(p.createdAt) : "—"}</span> · /{p.quote}</p>
+                      <p className="text-xs text-muted"><span className="text-up">{p.createdAt ? timeAgo(p.createdAt) : "—"}</span> · /{p.quote} <Lp p={p} /></p>
                     </div>
                   </Link>
                 </td>

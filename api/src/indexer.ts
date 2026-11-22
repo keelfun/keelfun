@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { parseEventLogs, verifyMessage } from "viem";
+import { decodeFunctionResult, encodeFunctionData, parseAbi, parseEventLogs, verifyMessage, type Hex } from "viem";
 import { launchFactoryAbi, launchHookAbi, launchTokenAbi } from "./abis";
 import { Rpc, type RpcLog } from "./rpc";
 import type { Env } from "./index";
@@ -202,6 +202,7 @@ export class Indexer extends DurableObject<Env> {
         code TEXT PRIMARY KEY, name TEXT, url TEXT, kind TEXT, description TEXT, payout TEXT, signature TEXT,
         approved INTEGER DEFAULT 0, created INTEGER
       );
+      CREATE TABLE IF NOT EXISTS token_meta (address TEXT PRIMARY KEY, lp TEXT, image TEXT, updated INTEGER);
       CREATE TABLE IF NOT EXISTS vaults (owner TEXT PRIMARY KEY, blob TEXT, updated INTEGER);
       CREATE TABLE IF NOT EXISTS scheduled (
         id TEXT PRIMARY KEY, creator TEXT, name TEXT, symbol TEXT, description TEXT, image TEXT, pair TEXT,
@@ -520,7 +521,7 @@ export class Indexer extends DurableObject<Env> {
     }
     if (!/^https?:\/\//.test(uri) && !uri.startsWith("ipfs://")) return null;
     try {
-      const url = uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${uri.slice(7)}` : uri;
+      const url = ipfsUrl(uri);
       const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
       return res.ok ? safeParse(await res.text()) : null;
     } catch {
@@ -559,6 +560,8 @@ export class Indexer extends DurableObject<Env> {
           return json(this.builders());
         case "scheduled":
           return json(this.scheduled(parts[1]));
+        case "meta":
+          return json(await this.tokenMeta(url.searchParams.get("a") ?? ""));
         case "revenue":
           return json(this.revenue());
         case "flywheel":
@@ -1022,6 +1025,31 @@ export class Indexer extends DurableObject<Env> {
     return json({ ok: true });
   }
 
+  private async tokenMeta(list: string) {
+    const addrs = [...new Set(list.toLowerCase().split(",").filter((a) => /^0x[0-9a-f]{40}$/.test(a)))].slice(0, 40);
+    const out: Record<string, { lp: string | null; image: string | null }> = {};
+    const now = Date.now();
+    const todo: string[] = [];
+    for (const a of addrs) {
+      const k = this.sql.exec("SELECT image FROM tokens WHERE address = ?", a).toArray()[0];
+      if (k) {
+        out[a] = { lp: "keelfun", image: k.image ? String(k.image) : null };
+        continue;
+      }
+      const r = this.sql.exec("SELECT lp, image, updated FROM token_meta WHERE address = ?", a).toArray()[0];
+      if (r && (r.lp || now - Number(r.updated) < 6 * 3600_000)) out[a] = { lp: r.lp ? String(r.lp) : null, image: r.image ? String(r.image) : null };
+      else todo.push(a);
+    }
+    if (todo.length) {
+      const found = await detectLaunchpads(this.rpc, todo.slice(0, 25));
+      for (const [a, m] of Object.entries(found)) {
+        out[a] = m;
+        this.sql.exec("INSERT INTO token_meta (address, lp, image, updated) VALUES (?, ?, ?, ?) ON CONFLICT(address) DO UPDATE SET lp = excluded.lp, image = excluded.image, updated = excluded.updated", a, m.lp, m.image, now);
+      }
+    }
+    return out;
+  }
+
   private scheduled(id?: string) {
     const now = Math.floor(Date.now() / 1000);
     const rows = id
@@ -1160,4 +1188,75 @@ export function scheduleMessage(symbol: string, at: number, creator: string) {
 
 export function builderMessage(code: string, payout: string) {
   return `Keel Builders\n\nCode: ${code}\nPayout wallet: ${payout.toLowerCase()}\n\nI accept the Keel Builders terms. This signature costs no gas and moves no funds.`;
+}
+
+const ipfsUrl = (u: string) => (u.startsWith("ipfs://") ? `https://ipfs.filebase.io/ipfs/${u.slice(7).replace(/^ipfs\//, "")}` : u);
+
+const MULTICALL = "0xcA11bde05977b3631167028862bE2a173976CA11";
+const DOPPLER_AIRLOCK = "0x660eaaedebc968f8f3694354fa8ec0b4c5ba8d12";
+const VIRTUALS_FACTORY = "0xf66dea7b3e897cd44a5a231c61b6b4423d613259";
+const CLANKER_FACTORIES = new Set([
+  "0x572e88d3cd7f23e4241eb6cedd96667271bf09a0", "0xe85a59c628f7d27878aceb4bf3b35733630083a9",
+  "0x2a787b2362021cc3eea3c24c4748a6cd5b687382", "0x375c15db32d28cecdcab5c03ab889bf15cbd2c5e",
+]);
+const probeAbi = parseAbi([
+  "function owner() view returns (address)", "function platformReferrer() view returns (address)", "function factory() view returns (address)",
+  "function tokenURI() view returns (string)", "function contractURI() view returns (string)", "function image() view returns (string)",
+]);
+const mcAbi = parseAbi(["function aggregate3((address target, bool allowFailure, bytes callData)[] calls) view returns ((bool success, bytes returnData)[])"]);
+const PROBES = ["owner", "platformReferrer", "factory", "tokenURI", "contractURI", "image"] as const;
+
+async function fetchJson(url: string, ms = 4000): Promise<Record<string, unknown> | null> {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(ms), headers: { accept: "application/json" } });
+    return r.ok ? ((await r.json()) as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function detectLaunchpads(rpc: Rpc, addrs: string[]) {
+  const calls = addrs.flatMap((a) => PROBES.map((f) => ({ target: a as Hex, allowFailure: true, callData: encodeFunctionData({ abi: probeAbi, functionName: f }) })));
+  const raw = await rpc.call<Hex>("eth_call", [{ to: MULTICALL, data: encodeFunctionData({ abi: mcAbi, functionName: "aggregate3", args: [calls] }) }, "latest"]);
+  const res = decodeFunctionResult({ abi: mcAbi, functionName: "aggregate3", data: raw });
+  const out: Record<string, { lp: string | null; image: string | null }> = {};
+  await Promise.all(addrs.map(async (a, i) => {
+    const v: Partial<Record<(typeof PROBES)[number], string>> = {};
+    PROBES.forEach((f, j) => {
+      const r = res[i * PROBES.length + j];
+      if (!r.success || r.returnData.length < 66) return;
+      try {
+        const d = String(decodeFunctionResult({ abi: probeAbi, functionName: f, data: r.returnData }));
+        if (d && d !== "0x0000000000000000000000000000000000000000") v[f] = d;
+      } catch {}
+    });
+    let lp: string | null = null;
+    let image: string | null = v.image && /^(https?|ipfs):/.test(v.image) ? ipfsUrl(v.image) : null;
+    const uri = v.tokenURI || v.contractURI;
+    const meta = uri && /^(https?|ipfs):/.test(uri) ? await fetchJson(ipfsUrl(uri)) : null;
+    if (!image && typeof meta?.image === "string" && /^(https?|ipfs):/.test(meta.image)) image = ipfsUrl(meta.image);
+    const provider = Array.isArray(meta?.attributes) ? (meta.attributes as { trait_type?: string; value?: unknown }[]).find((x) => x.trait_type === "launch_provider")?.value : undefined;
+    if (v.platformReferrer) lp = "zora";
+    else if (v.owner?.toLowerCase() === DOPPLER_AIRLOCK) lp = typeof provider === "string" && /^[a-z0-9 ._-]{2,20}$/i.test(provider) ? provider.toLowerCase() : "doppler";
+    else if (v.owner?.toLowerCase() === VIRTUALS_FACTORY) lp = "virtuals";
+    else if (v.factory && CLANKER_FACTORIES.has(v.factory.toLowerCase())) lp = "clanker";
+    out[a] = { lp, image };
+  }));
+  const unknown = addrs.filter((a) => !out[a].lp).slice(0, 8);
+  await Promise.all(unknown.map(async (a) => {
+    const j = await fetchJson(`https://www.clanker.world/api/tokens?q=${a}`);
+    const t = (j?.data as { contract_address?: string; img_url?: string; social_context?: { interface?: string } }[] | undefined)?.find((x) => x.contract_address?.toLowerCase() === a);
+    if (!t) return;
+    out[a].lp = /bankr/i.test(t.social_context?.interface ?? "") ? "bankr" : "clanker";
+    if (!out[a].image && t.img_url && /^https?:/.test(t.img_url)) out[a].image = t.img_url;
+  }));
+  const noImg = addrs.filter((a) => !out[a].image);
+  if (noImg.length) {
+    const ds = (await fetch(`https://api.dexscreener.com/tokens/v1/base/${noImg.slice(0, 30).join(",")}`, { signal: AbortSignal.timeout(4000) }).then((r) => r.json()).catch(() => [])) as { baseToken?: { address: string }; info?: { imageUrl?: string } }[];
+    for (const p of Array.isArray(ds) ? ds : []) {
+      const a = p.baseToken?.address.toLowerCase();
+      if (a && out[a] && !out[a].image && p.info?.imageUrl) out[a].image = p.info.imageUrl;
+    }
+  }
+  return out;
 }

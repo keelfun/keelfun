@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { baseMeta, Bolt, keelMeta, PresetBar, RowSell, useKeelBuy, usePrefs, useRelayBuy } from "@/components/QuickBuy";
 import { TokenAvatar } from "@/components/TokenAvatar";
+import { LaunchpadChip, PoolAvatar, useLaunchpad } from "@/components/PoolAvatar";
 import { api, useTokens, type Portfolio, type Token } from "@/lib/api";
 import { fetchBasePools, type BasePool } from "@/lib/basePools";
 import { pairInfo } from "@/lib/config";
@@ -304,12 +305,12 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
     setTimeout(() => setState(""), 4000);
   };
   const t = p.token;
+  const lp = useLaunchpad(t.address, p.dex);
   return (
     <Link href={`/pair/?p=${p.pool}`} className="group block border-b border-line px-3 py-2.5 transition-colors hover:bg-panel-2/60">
       <div className="flex gap-3">
         <div className="relative shrink-0">
-          <TokenAvatar src={t.image} symbol={t.symbol} size={52} />
-          <span className="absolute -bottom-1 -right-1 rounded bg-bg px-1 font-mono text-[9px] text-muted ring-1 ring-line">{DEX[p.dex] ?? p.dex.replace(/-base$/, "").slice(0, 8)}</span>
+          <PoolAvatar token={t} dex={p.dex} dexLabel={DEX[p.dex] ?? p.dex.replace(/-base$/, "").slice(0, 8)} size={52} />
           <p className="mt-1.5 text-center font-mono text-[10px] text-dim">{t.address.slice(0, 4)}…{t.address.slice(-3)}</p>
         </div>
         <div className="min-w-0 flex-1">
@@ -328,6 +329,7 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
           <div className="mt-1 flex items-center gap-2 text-xs text-muted">
             <span className="text-up">{p.createdAt ? timeAgo(p.createdAt) : "—"}</span>
             <span className="rounded-full border border-line px-1.5 py-px text-[10px]">/{p.quote}</span>
+            {lp && <LaunchpadChip id={lp} />}
             <span className="inline-flex items-center gap-0.5" title="Traders 24h">
               <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="8" r="3.5" /><path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5" /></svg>
               {fmtCompact(p.traders, 1)}
