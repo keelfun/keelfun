@@ -7,6 +7,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { useAccount, useWalletClient } from "wagmi";
 import { CATS, fetchAccount, fetchBook, fetchCandles, fetchMarkets, fetchTrades, hlAgent, hlPx, hlSz, hlUser, type Cat, type Market } from "@/lib/hl";
 import { fmtCompact, fmtPrice, shortAddr } from "@/lib/format";
+import { TokenAvatar } from "@/components/TokenAvatar";
 import { errMsg, useEnsureWallet } from "@/lib/tx";
 import { useVault, vaultActions } from "@/lib/vault";
 
@@ -14,6 +15,16 @@ const css = (v: string, fb: string) => getComputedStyle(document.documentElement
 const usd = (n: number) => (Math.abs(n) >= 1e4 ? `$${fmtCompact(n)}` : `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
 const px = (n: number) => (n >= 1000 ? n.toLocaleString(undefined, { maximumFractionDigits: 1 }) : fmtPrice(n));
 const SLIP = 0.05;
+
+function CoinIcon({ coin, size = 18 }: { coin: string; size?: number }) {
+  const name = coin.replace(/^[a-z]+:/, "");
+  const srcs = [coin, ...(/^k[A-Z]/.test(name) ? [name.slice(1)] : [])].map((c) => `https://app.hyperliquid.xyz/coins/${c}.svg`);
+  const [i, setI] = useState(0);
+  useEffect(() => setI(0), [coin]);
+  if (i >= srcs.length) return <TokenAvatar symbol={name.replace(/^k(?=[A-Z])/, "")} size={size} className="!rounded-full" />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={srcs[i]} alt="" loading="lazy" width={size} height={size} onError={() => setI((n) => n + 1)} className="shrink-0 rounded-full" style={{ width: size, height: size }} />;
+}
 const TF = [
   ["1m", 6 * 3600e3],
   ["5m", 24 * 3600e3],
@@ -307,7 +318,7 @@ function AccountPanel({ markets, onPick }: { markets: Market[]; onPick: (coin: s
                 const pnl = Number(p.unrealizedPnl);
                 return (
                   <tr key={p.coin} className="border-t border-line">
-                    <td className="px-3 py-1.5 text-left"><button onClick={() => onPick(p.coin)} className={long ? "text-up" : "text-down"}>{p.coin.replace(/^xyz:/, "")} {p.leverage.value}x</button></td>
+                    <td className="px-3 py-1.5 text-left"><button onClick={() => onPick(p.coin)} className={`inline-flex items-center gap-1.5 ${long ? "text-up" : "text-down"}`}><CoinIcon coin={p.coin} size={16} />{p.coin.replace(/^xyz:/, "")} {p.leverage.value}x</button></td>
                     <td className="px-3">{Math.abs(+p.szi)}</td>
                     <td className="px-3">{usd(+p.positionValue)}</td>
                     <td className="px-3">{px(+p.entryPx)}</td>
@@ -338,7 +349,7 @@ function AccountPanel({ markets, onPick }: { markets: Market[]; onPick: (coin: s
                 const m = byCoin.get(o.coin);
                 return (
                   <tr key={o.oid} className="border-t border-line">
-                    <td className="px-3 py-1.5 text-left">{o.coin.replace(/^xyz:/, "")}</td>
+                    <td className="px-3 py-1.5 text-left"><span className="inline-flex items-center gap-1.5"><CoinIcon coin={o.coin} size={16} />{o.coin.replace(/^xyz:/, "")}</span></td>
                     <td className="px-3">{o.orderType}{o.reduceOnly ? " · RO" : ""}</td>
                     <td className={`px-3 ${o.side === "B" ? "text-up" : "text-down"}`}>{o.side === "B" ? "Long" : "Short"}</td>
                     <td className="px-3">{o.sz}</td>
@@ -376,6 +387,7 @@ export default function PerpsPage() {
         </div>
         <div className="relative">
           <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2 text-lg font-bold">
+            <CoinIcon coin={coin} size={24} />
             {m?.name ?? coin}-USD <span className="rounded bg-panel-2 px-1.5 py-0.5 text-[10px] font-normal text-muted">{m ? `${m.maxLev}x` : ""}</span> <span className="text-xs text-muted">▾</span>
           </button>
           {open && (
@@ -394,7 +406,7 @@ export default function PerpsPage() {
                   <tbody>
                     {list.map((x) => (
                       <tr key={x.coin} onClick={() => (setCoin(x.coin), setOpen(false))} className="cursor-pointer border-t border-line hover:bg-panel-2">
-                        <td className="px-3 py-1.5 text-left"><span className="text-fg">{x.name}</span> <span className="text-[10px] text-dim">{x.maxLev}x{x.dex ? " · " + x.cat : ""}</span></td>
+                        <td className="px-3 py-1.5 text-left"><span className="inline-flex items-center gap-2"><CoinIcon coin={x.coin} /><span className="text-fg">{x.name}</span></span> <span className="text-[10px] text-dim">{x.maxLev}x{x.dex ? " · " + x.cat : ""}</span></td>
                         <td className="px-3">{px(x.mark)}</td>
                         <td className={`px-3 ${x.change >= 0 ? "text-up" : "text-down"}`}>{x.change >= 0 ? "+" : ""}{x.change.toFixed(2)}%</td>
                         <td className="px-3 text-muted">{(x.funding * 100).toFixed(4)}%</td>
