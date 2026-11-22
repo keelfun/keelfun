@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { Bolt, PresetBar, useKeelBuy, usePrefs, useRelayBuy } from "@/components/QuickBuy";
+import { baseMeta, Bolt, keelMeta, PresetBar, RowSell, useKeelBuy, usePrefs, useRelayBuy } from "@/components/QuickBuy";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { api, useTokens, type Portfolio, type Token } from "@/lib/api";
 import { fetchBasePools, type BasePool } from "@/lib/basePools";
@@ -90,6 +90,7 @@ function Row({ t, ethUsd, amount, buy }: { t: Token; ethUsd: number; amount: str
               <Bolt />
               {state === "busy" ? "…" : state === "ok" ? "Bought" : state ? "Failed" : native ? amount : pair.symbol}
             </button>
+            <RowSell meta={keelMeta(t)} />
           </div>
           <div className="mt-1.5 flex flex-wrap gap-1">
             <span className={`${chip} ${t.change24h >= 0 ? "border-up/40 text-up" : "border-down/40 text-down"}`}>{fmtPct(t.change24h)}</span>
@@ -209,6 +210,7 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
               <Bolt />
               {state === "busy" ? "…" : state === "ok" ? "Bought" : state ? "Failed" : amount}
             </button>
+            <RowSell meta={baseMeta(t)} />
           </div>
           <div className="mt-1.5 flex flex-wrap gap-1">
             {pctChip(p.chg5m, "5m")}

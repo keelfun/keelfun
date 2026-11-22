@@ -172,6 +172,13 @@ export function vaultPlan(preset: number, amount: number): { w: VaultWallet; amo
   return ws.map((w) => ({ w, amount: data!.mode === "each" ? amount : amount / ws.length }));
 }
 
+/** Wallets quick sell uses: the active preset group, or every wallet when the group is empty. */
+export function vaultSellWallets(preset: number): VaultWallet[] {
+  if (!data) return [];
+  const g = (data.groups[preset] ?? []).map((i) => data!.wallets[i]).filter(Boolean);
+  return g.length ? g : data.wallets;
+}
+
 export function useVault() {
   const [state, setState] = useState<{ exists: boolean; kind?: "sig" | "password"; owner?: string; data: VaultData | null }>({ exists: false, data: null });
   useEffect(() => {

@@ -1,17 +1,22 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { parseEther } from "viem";
+import { erc20Abi, formatUnits, parseEther } from "viem";
 import { usePublicClient, useSendTransaction, useWriteContract } from "wagmi";
 import { ETH, getQuote } from "@/components/AnySwap";
 import { launchRouterAbi } from "@/lib/abis";
 import type { Token } from "@/lib/api";
 import type { BasePool } from "@/lib/basePools";
 import { ADDR, chain } from "@/lib/config";
-import { useConfirm, useEnsureWallet } from "@/lib/tx";
-import { vaultActions, vaultClient, vaultPlan, vaultPublic } from "@/lib/vault";
+import { fmtCompact } from "@/lib/format";
+import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
+import { useVault, vaultActions, vaultClient, vaultPlan, vaultPublic, vaultSellWallets, type TokenMeta } from "@/lib/vault";
+import { vaultSell } from "@/lib/vaultHoldings";
 
 export type Preset = { amount: string; slippage: number };
-type Prefs = { active: number; presets: Preset[] };
+type Prefs = { active: number; presets: Preset[]; sell?: number };
+const SELL_PCTS = [25, 50, 100];
 const KEY = "keel-quick";
 const EVT = "keel-quick";
 const DEF: Prefs = { active: 0, presets: [{ amount: "0.001", slippage: 15 }, { amount: "0.01", slippage: 15 }, { amount: "0.05", slippage: 20 }] };
@@ -43,6 +48,8 @@ export function usePrefs() {
   return {
     prefs: p,
     preset: p.presets[p.active] ?? DEF.presets[0],
+    sellPct: p.sell ?? 100,
+    setSell: (n: number) => save({ ...p, sell: n }),
     setActive: (i: number) => save({ ...p, active: i }),
     setPreset: (i: number, v: Partial<Preset>) => save({ ...p, presets: p.presets.map((x, j) => (j === i ? { ...x, ...v } : x)) }),
   };
@@ -55,7 +62,7 @@ export function Bolt({ className = "h-3.5 w-3.5" }: { className?: string }) {
 }
 
 export function PresetBar({ compact = false }: { compact?: boolean }) {
-  const { prefs, preset, setActive, setPreset } = usePrefs();
+  const { prefs, preset, setActive, setPreset, sellPct, setSell } = usePrefs();
   const [open, setOpen] = useState(false);
   return (
     <div className="relative flex items-center gap-1.5">
@@ -97,7 +104,15 @@ export function PresetBar({ compact = false }: { compact?: boolean }) {
               </label>
             </div>
           ))}
-          <p className="text-[11px] leading-relaxed text-dim">Slippage applies to Keelfun pools. Other Base tokens route through Relay with its own price protection.</p>
+          <div className="mb-2 mt-3 flex items-center gap-2 text-xs">
+            <span className="font-semibold">Quick sell</span>
+            <div className="ml-auto flex rounded-lg border border-line p-0.5">
+              {SELL_PCTS.map((n) => (
+                <button key={n} onClick={() => setSell(n)} className={`rounded-md px-2 py-0.5 font-mono text-[11px] ${sellPct === n ? "bg-down/20 text-down" : "text-dim hover:text-fg"}`}>{n}%</button>
+              ))}
+            </div>
+          </div>
+          <p className="text-[11px] leading-relaxed text-dim">Quick sell sells from your trading wallets (the active preset group, or all of them). Slippage applies to Keelfun pools. Other Base tokens route through Relay with its own price protection.</p>
         </div>
       )}
     </div>
@@ -180,4 +195,119 @@ export function useRelayBuy() {
       }
     }
   };
+}
+
+export const keelMeta = (t: Pick<Token, "address" | "symbol" | "name" | "image">): TokenMeta => ({ address: t.address, symbol: t.symbol, name: t.name, decimals: 18, image: t.image ?? null, keel: true });
+export const baseMeta = (t: BasePool["token"]): TokenMeta => ({ address: t.address as `0x${string}`, symbol: t.symbol, name: t.name, decimals: t.decimals, image: t.image ?? null });
+
+async function heldBy(meta: TokenMeta) {
+  const ws = vaultSellWallets(load().active);
+  if (!ws.length) return [];
+  const bals = await vaultPublic().multicall({
+    contracts: ws.map((w) => ({ address: meta.address, abi: erc20Abi, functionName: "balanceOf", args: [w.address] }) as const),
+    allowFailure: true,
+  });
+  return ws.map((w, i) => ({ w, raw: (bals[i].result as bigint | undefined) ?? 0n })).filter((x) => x.raw > 0n);
+}
+
+/** Sells pct% of a token from every trading wallet that holds it. */
+export function useQuickSell() {
+  return async (meta: TokenMeta, pct: number) => {
+    if (!vaultSellWallets(0).length) throw new Error("Unlock your trading wallets to quick sell");
+    const held = await heldBy(meta);
+    if (!held.length) throw new Error(`No ${meta.symbol} in your trading wallets`);
+    const p = load();
+    const slip = p.presets[p.active]?.slippage ?? 15;
+    await Promise.all(held.map(({ w, raw }) => vaultSell(w, { meta, raw, amount: 0, usd: 0 }, pct, slip)));
+  };
+}
+
+function useHeld(meta: TokenMeta, enabled: boolean) {
+  const { prefs } = usePrefs();
+  return useQuery({
+    queryKey: ["qs-held", meta.address.toLowerCase(), prefs.active],
+    enabled,
+    refetchInterval: 15000,
+    queryFn: async () => (await heldBy(meta)).reduce((a, x) => a + x.raw, 0n),
+  });
+}
+
+/** Quick sell panel for a token page: 25% / 50% / 100% from trading wallets. */
+export function QuickSell({ meta }: { meta: TokenMeta }) {
+  const v = useVault();
+  const sell = useQuickSell();
+  const held = useHeld(meta, !!v.data);
+  const [s, setS] = useState<{ pct: number; msg: string } | null>(null);
+  const go = async (pct: number) => {
+    setS({ pct, msg: "busy" });
+    try {
+      await sell(meta, pct);
+      setS({ pct, msg: "ok" });
+      held.refetch();
+    } catch (e) {
+      setS({ pct, msg: errMsg(e) });
+    }
+    setTimeout(() => setS(null), 5000);
+  };
+  const amt = held.data ? Number(formatUnits(held.data, meta.decimals)) : 0;
+  return (
+    <div className="rounded-xl border border-line bg-panel p-3">
+      <div className="mb-2 flex items-center text-xs">
+        <span className="font-semibold">Quick sell</span>
+        {v.data && <span className="ml-auto font-mono text-dim">Held {held.data == null ? "…" : fmtCompact(amt)} {meta.symbol}</span>}
+      </div>
+      {!v.data ? (
+        <p className="text-xs text-dim">
+          Sells straight from your trading wallets, no popup. <Link href="/wallets/" className="text-accent hover:underline">{v.exists ? "Unlock wallets" : "Create a trading wallet"}</Link>
+        </p>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {SELL_PCTS.map((n) => (
+            <button
+              key={n}
+              onClick={() => go(n)}
+              disabled={!!s && s.msg === "busy"}
+              className="h-9 rounded-lg border border-down/50 bg-down/10 font-mono text-xs font-semibold text-down hover:bg-down/20 disabled:opacity-50"
+            >
+              {s?.pct === n && s.msg === "busy" ? "Selling…" : s?.pct === n && s.msg === "ok" ? "Sold" : n === 100 ? "Sell all" : `${n}%`}
+            </button>
+          ))}
+        </div>
+      )}
+      {s && s.msg !== "busy" && s.msg !== "ok" && <p className="mt-1.5 text-xs text-down">{s.msg}</p>}
+    </div>
+  );
+}
+
+/** Small sell button for list rows; only shown for tokens a trading wallet has bought. */
+export function RowSell({ meta, className = "h-8 px-2.5" }: { meta: TokenMeta; className?: string }) {
+  const v = useVault();
+  const { sellPct } = usePrefs();
+  const sell = useQuickSell();
+  const [s, setS] = useState("");
+  const a = meta.address.toLowerCase();
+  const tracked = !!v.data && Object.values(v.data.tokens ?? {}).some((l) => l.some((x) => x.address.toLowerCase() === a));
+  if (!tracked) return null;
+  const go = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (s === "busy") return;
+    setS("busy");
+    try {
+      await sell(meta, sellPct);
+      setS("ok");
+    } catch (err) {
+      setS(errMsg(err));
+    }
+    setTimeout(() => setS(""), 4000);
+  };
+  return (
+    <button
+      onClick={go}
+      title={s && s !== "busy" && s !== "ok" ? s : `Quick sell ${sellPct}% from trading wallets`}
+      className={`flex shrink-0 items-center rounded-lg border font-mono text-xs font-semibold ${className} ${s === "ok" ? "border-down bg-down/20 text-down" : s && s !== "busy" ? "border-down/60 text-down" : "border-down/50 bg-down/10 text-down hover:bg-down/20"}`}
+    >
+      {s === "busy" ? "…" : s === "ok" ? "Sold" : s ? "Failed" : `S ${sellPct}%`}
+    </button>
+  );
 }

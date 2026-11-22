@@ -6,6 +6,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { FeesCard } from "@/components/FeesCard";
 import { TradePanel } from "@/components/TradePanel";
+import { keelMeta, QuickSell } from "@/components/QuickBuy";
 import { useFees, useHolders, useToken, useTrades, type FeeEvent, type Token } from "@/lib/api";
 import { EXPLORER, pairInfo } from "@/lib/config";
 import { fmtCompact, fmtEth, fmtPct, fmtPrice, fmtValue, shortAddr, timeAgo } from "@/lib/format";
@@ -299,6 +300,7 @@ function TokenBody({ t, ethUsd }: { t: Token; ethUsd: number }) {
           <PriceChart t={t} ethUsd={ethUsd} />
           <div id="trade-m" className="lg:hidden">
             <TradePanel key={`m${side.n}`} token={t} defaultSide={side.s} />
+            <div className="mt-3"><QuickSell meta={keelMeta(t)} /></div>
           </div>
           <div className="lg:hidden">
             <Info t={t} ethUsd={ethUsd} />
@@ -308,6 +310,7 @@ function TokenBody({ t, ethUsd }: { t: Token; ethUsd: number }) {
         <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <div className="hidden lg:block">
             <TradePanel token={t} />
+            <div className="mt-3"><QuickSell meta={keelMeta(t)} /></div>
           </div>
           <div className="hidden lg:block">
             <Info t={t} ethUsd={ethUsd} />

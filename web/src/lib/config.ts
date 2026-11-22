@@ -9,6 +9,7 @@ export const base = defineChain({
   nativeCurrency: eth,
   rpcUrls: { default: { http: ["https://mainnet.base.org"] } },
   blockExplorers: { default: { name: "Basescan", url: "https://basescan.org" } },
+  contracts: { multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11", blockCreated: 5022 } },
 });
 
 export const baseSepolia = defineChain({
@@ -17,6 +18,7 @@ export const baseSepolia = defineChain({
   nativeCurrency: eth,
   rpcUrls: { default: { http: ["https://sepolia.base.org"] } },
   blockExplorers: { default: { name: "Basescan", url: "https://sepolia.basescan.org" } },
+  contracts: { multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11", blockCreated: 1059647 } },
   testnet: true,
 });
 

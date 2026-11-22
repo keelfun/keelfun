@@ -5,7 +5,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CandlestickSeries, ColorType, createChart, HistogramSeries, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import { AnySwap } from "@/components/AnySwap";
-import { Bolt, PresetBar, usePrefs, useRelayBuy } from "@/components/QuickBuy";
+import { baseMeta, Bolt, PresetBar, QuickSell, usePrefs, useRelayBuy } from "@/components/QuickBuy";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { api, type Token } from "@/lib/api";
 import { DEX_LABEL, fetchOhlcv, fetchPool, fetchPoolTrades, fetchTokenTopPool, type PoolDetail } from "@/lib/basePools";
@@ -204,6 +204,7 @@ function PairView() {
         </div>
         <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <QuickBtn p={p} />
+          <QuickSell meta={baseMeta(p.token)} />
           <AnySwap initialGet={p.token.address} />
           <p className="text-xs leading-relaxed text-dim">Swaps route through Relay at the best price on Base. Anyone can create a token on Base, including copies of real names, so check the contract first.</p>
         </div>

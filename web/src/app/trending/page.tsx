@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Bolt, PresetBar, usePrefs, useRelayBuy } from "@/components/QuickBuy";
+import { baseMeta, Bolt, PresetBar, RowSell, usePrefs, useRelayBuy } from "@/components/QuickBuy";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { DEX_LABEL, fetchBasePools, type BasePool } from "@/lib/basePools";
 import { fmtCompact, fmtPrice, fmtUsd, timeAgo } from "@/lib/format";
@@ -128,6 +128,7 @@ export default function TrendingPage() {
                   <div className="flex items-center justify-end gap-2">
                     <span className="hidden font-mono text-xs text-dim xl:inline">${fmtPrice(p.priceUsd)}</span>
                     <BuyBtn p={p} />
+                    <RowSell meta={baseMeta(p.token)} className="h-9 rounded-full px-3" />
                   </div>
                 </td>
               </tr>
