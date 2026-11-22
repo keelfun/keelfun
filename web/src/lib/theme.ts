@@ -3,7 +3,7 @@ export type ThemeColors = Record<(typeof THEME_KEYS)[number], string>;
 const mk = (v: string): ThemeColors => Object.fromEntries(v.split(" ").map((c, i) => [THEME_KEYS[i], c])) as ThemeColors;
 
 export const THEMES: { id: string; name: string; colors: ThemeColors }[] = [
-  { id: "keel", name: "Keelfun", colors: mk("#05070d #0b0f1a #111727 #1c2436 #27314a #3d7bff #7fd4ff #bcd3ff #ffffff") },
+  { id: "keel", name: "Base", colors: mk("#000000 #0a0b0d #121317 #1e2025 #2a2d33 #0000ff #3c8aff #b4c8ff #ffffff") },
   { id: "dark", name: "Dark", colors: mk("#0a0a0b #111113 #18181b #232327 #2e2e33 #7cb7ff #a9d4ff #cfe4ff #06121f") },
   { id: "dusk", name: "Dusk", colors: mk("#070818 #0d0f24 #14173a #1f2350 #2a2f66 #5b6cff #8f9bff #c5ccff #ffffff") },
   { id: "astro", name: "Astro", colors: mk("#0a0716 #120d24 #1a1433 #261d48 #32275c #8b5cf6 #c4a5ff #ddd0ff #ffffff") },
@@ -17,10 +17,12 @@ export const THEME_STORAGE = "keel-theme";
 export function applyTheme(t: StoredTheme) {
   const el = document.documentElement;
   for (const k of THEME_KEYS) el.style.removeProperty(`--color-${k}`);
+  el.style.removeProperty("--color-accent-fg");
   delete el.dataset.theme;
   if (t.id === "custom" && t.colors) {
     for (const k of THEME_KEYS) if (t.colors[k]) el.style.setProperty(`--color-${k}`, t.colors[k]);
+    if (t.colors.accent) el.style.setProperty("--color-accent-fg", t.colors.accent);
   } else if (t.id !== "keel") el.dataset.theme = t.id;
 }
 
-export const THEME_BOOT = `try{var t=JSON.parse(localStorage.getItem("${THEME_STORAGE}")||"null");if(t){var e=document.documentElement;if(t.id==="custom"&&t.colors){for(var k in t.colors)e.style.setProperty("--color-"+k,t.colors[k])}else if(t.id&&t.id!=="keel")e.dataset.theme=t.id}}catch(_){}`;
+export const THEME_BOOT = `try{var t=JSON.parse(localStorage.getItem("${THEME_STORAGE}")||"null");if(t){var e=document.documentElement;if(t.id==="custom"&&t.colors){for(var k in t.colors)e.style.setProperty("--color-"+k,t.colors[k]);if(t.colors.accent)e.style.setProperty("--color-accent-fg",t.colors.accent)}else if(t.id&&t.id!=="keel")e.dataset.theme=t.id}}catch(_){}`;

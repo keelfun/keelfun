@@ -37,7 +37,7 @@ export default function FlywheelPage() {
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map(([t, d], i) => (
           <div key={t} className="anim-rise relative overflow-hidden rounded-2xl border border-line bg-panel p-5" style={{ animationDelay: `${i * 80}ms` }}>
-            <span className="font-mono text-xs text-accent">0{i + 1}</span>
+            <span className="font-mono text-xs text-accent-fg">0{i + 1}</span>
             <p className="mt-2 text-lg font-semibold">{t}</p>
             <p className="mt-1.5 text-sm leading-relaxed text-muted">{d}</p>
             {i < 3 && <span className="absolute right-4 top-4 hidden text-dim lg:block">→</span>}
@@ -80,7 +80,7 @@ export default function FlywheelPage() {
                 </div>
                 <div className="text-right">
                   <p>{fmtValue(r.eth, usd)}</p>
-                  {EXPLORER && <a href={`${EXPLORER}/tx/${r.tx}`} target="_blank" rel="noreferrer" className="text-xs text-accent hover:underline">view burn</a>}
+                  {EXPLORER && <a href={`${EXPLORER}/tx/${r.tx}`} target="_blank" rel="noreferrer" className="text-xs text-accent-fg hover:underline">view burn</a>}
                 </div>
               </div>
             ))}

@@ -81,7 +81,7 @@ function TerminalMenu() {
                 <span className="block text-xs text-dim">{m.desc}</span>
               </a>
             ))}
-            <a href={TERMINAL_URL} className="mt-1 block rounded-lg border-t border-line px-3 py-2 text-xs text-accent hover:bg-panel-2">Open terminal.keelfun.app ↗</a>
+            <a href={TERMINAL_URL} className="mt-1 block rounded-lg border-t border-line px-3 py-2 text-xs text-accent-fg hover:bg-panel-2">Open terminal.keelfun.app ↗</a>
           </div>
         </div>
       )}
@@ -141,7 +141,7 @@ export function Header() {
           </span>
           <Link
             href="/launch/"
-            className="hidden h-9 items-center whitespace-nowrap rounded-lg border border-accent/40 px-3 text-sm font-medium text-accent hover:bg-accent/10 sm:flex lg:hidden xl:flex"
+            className="hidden h-9 items-center whitespace-nowrap rounded-lg border border-accent/40 px-3 text-sm font-medium text-accent-fg hover:bg-accent/10 sm:flex lg:hidden xl:flex"
           >
             + Launch
           </Link>
@@ -158,7 +158,7 @@ export function Header() {
               {n.label}
             </Link>
             {i === 0 && (
-              <a href={TERMINAL_URL} className="shrink-0 rounded-lg px-3 py-1.5 text-sm text-accent">Terminal ↗</a>
+              <a href={TERMINAL_URL} className="shrink-0 rounded-lg px-3 py-1.5 text-sm text-accent-fg">Terminal ↗</a>
             )}
           </span>
         ))}
@@ -219,7 +219,7 @@ function TerminalHeader({ active }: { active: (h: string) => boolean }) {
         </nav>
         <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
           <SearchK wide />
-          <a href="https://keelfun.app/launch/" aria-label="Launch a token" title="Launch a token" className="hidden h-9 w-9 items-center justify-center rounded-full border border-accent/40 text-accent hover:bg-accent/10 sm:flex">
+          <a href="https://keelfun.app/launch/" aria-label="Launch a token" title="Launch a token" className="hidden h-9 w-9 items-center justify-center rounded-full border border-accent/40 text-accent-fg hover:bg-accent/10 sm:flex">
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2.1-.1-2.9a2.2 2.2 0 0 0-2.9-.1z" /><path d="m12 15-3-3a22 22 0 0 1 2-3.9A12.9 12.9 0 0 1 22 2c0 2.7-.8 7.5-6 11a22.4 22.4 0 0 1-4 2z" /><path d="M9 12H4s.6-3 2-4c1.6-1.1 5 0 5 0M12 15v5s3-.6 4-2c1.1-1.6 0-5 0-5" /></svg>
           </a>
           <GearMenu />

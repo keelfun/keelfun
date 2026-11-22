@@ -89,7 +89,7 @@ export function SearchK({ wide = false }: { wide?: boolean }) {
                       <p className="truncate text-xs text-dim">{it.sub}</p>
                     </div>
                     {it.right && <span className="font-mono text-xs text-muted">{it.right}</span>}
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${it.tag === "Keelfun" ? "bg-accent/15 text-accent" : "bg-panel-2 text-muted"}`}>{it.tag}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${it.tag === "Keelfun" ? "bg-accent/15 text-accent-fg" : "bg-panel-2 text-muted"}`}>{it.tag}</span>
                   </button>
                 ))}
                 {!dq && <p className="px-3 py-6 text-center text-xs text-dim">Search Keelfun tokens and every pair on Base. Paste a wallet to open its portfolio.</p>}

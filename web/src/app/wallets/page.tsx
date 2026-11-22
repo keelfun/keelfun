@@ -129,7 +129,7 @@ function Row({ w, i, groups, tracked, acts, onErr }: { w: VaultWallet; i: number
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {[0, 1, 2].map((g) => (
-          <button key={g} onClick={() => vaultActions.toggleGroup(g, i)} className={`h-7 rounded-md border px-2 font-mono text-xs ${groups[g]?.includes(i) ? "border-accent bg-accent/15 text-accent" : "border-line text-dim hover:text-fg"}`}>P{g + 1}</button>
+          <button key={g} onClick={() => vaultActions.toggleGroup(g, i)} className={`h-7 rounded-md border px-2 font-mono text-xs ${groups[g]?.includes(i) ? "border-accent bg-accent/15 text-accent-fg" : "border-line text-dim hover:text-fg"}`}>P{g + 1}</button>
         ))}
         <label className="ml-auto flex h-8 items-center gap-1 rounded-lg border border-line bg-bg px-2">
           <input value={fund} onChange={(e) => setFund(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.01" inputMode="decimal" className="w-16 bg-transparent font-mono text-xs outline-none" />

@@ -120,7 +120,7 @@ function Info({ t, ethUsd }: { t: Token; ethUsd: number }) {
   );
   const d = new Date(t.createdAt * 1000);
   const rows: [string, React.ReactNode][] = [
-    ["Creator", <Link key="c" href={`/portfolio/?w=${t.creator}`} className="hover:text-accent">{shortAddr(t.creator)}</Link>],
+    ["Creator", <Link key="c" href={`/portfolio/?w=${t.creator}`} className="hover:text-accent-fg">{shortAddr(t.creator)}</Link>],
     ["Created", <span key="d" className="text-right"><span className="block">{d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span><span className="block text-[11px] text-dim">({timeAgo(t.createdAt)} ago)</span></span>],
     ["Buy / sell tax", `${t.buyBps / 100}% / ${t.sellBps / 100}%`],
     ["Lifetime volume", both(t.volumeEth)],
@@ -147,7 +147,7 @@ function Info({ t, ethUsd }: { t: Token; ethUsd: number }) {
 const FEE_LABEL: Record<FeeEvent["kind"], [string, string]> = {
   buy_tax: ["Buy tax", "text-up"],
   sell_tax: ["Sell tax", "text-down"],
-  claim: ["Creator claim", "text-accent"],
+  claim: ["Creator claim", "text-accent-fg"],
   holders: ["Holder dividends", "text-up"],
   burn: ["Buyback burn", "text-warn"],
 };
@@ -205,7 +205,7 @@ function Activity({ t, ethUsd }: { t: Token; ethUsd: number }) {
                     <td className={`${td} text-right`}>{fmtCompact(r.tokens)} <span className="text-dim">{t.symbol}</span></td>
                     <td className={`${td} text-right`}>{fmtCompact(Number(r.pairAmount ?? r.eth), 4)} {pair.symbol}{approx(r.eth)}</td>
                     <td className={`${td} text-right`}>
-                      <Link href={`/portfolio/?w=${r.trader}`} className={`hover:text-accent ${r.trader === t.creator ? "text-warn" : "text-muted"}`}>
+                      <Link href={`/portfolio/?w=${r.trader}`} className={`hover:text-accent-fg ${r.trader === t.creator ? "text-warn" : "text-muted"}`}>
                         {r.trader === t.creator ? "dev" : shortAddr(r.trader)}
                       </Link>
                     </td>
@@ -231,7 +231,7 @@ function Activity({ t, ethUsd }: { t: Token; ethUsd: number }) {
                 <tr key={h.holder} className="border-b border-line/70">
                   <td className={`${td} text-muted`}>{i + 1}</td>
                   <td className={td}>
-                    <Link href={`/portfolio/?w=${h.holder}`} className="hover:text-accent">{shortAddr(h.holder)}</Link>
+                    <Link href={`/portfolio/?w=${h.holder}`} className="hover:text-accent-fg">{shortAddr(h.holder)}</Link>
                     {h.label && <span className="ml-2 rounded bg-panel-2 px-1.5 py-0.5 text-[10px] text-muted">{h.label === "pool" ? "v4 pool" : h.label}</span>}
                   </td>
                   <td className={`${td} text-right`}>{fmtCompact(h.amount)}</td>

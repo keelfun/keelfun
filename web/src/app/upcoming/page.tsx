@@ -69,7 +69,7 @@ function Card({ l, now, me }: { l: Scheduled; now: number; me?: string }) {
         </div>
       </div>
       <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-xs">
-        <Link href={`/portfolio/?w=${l.creator}`} className="font-mono text-dim hover:text-accent">by {shortAddr(l.creator)}</Link>
+        <Link href={`/portfolio/?w=${l.creator}`} className="font-mono text-dim hover:text-accent-fg">by {shortAddr(l.creator)}</Link>
         {l.token ? (
           <Link href={`/token/?a=${l.token}`} className="rounded-lg bg-accent px-3 py-1.5 font-medium text-white">Trade</Link>
         ) : mine && left <= 0 ? (

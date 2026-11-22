@@ -34,7 +34,7 @@ function Chart({ pool, supply }: { pool: string; supply: number }) {
   const { data } = useQuery({ queryKey: ["ohlcv", pool, t.l], queryFn: () => fetchOhlcv(pool, t.tf, t.a), refetchInterval: 30000, retry: 2 });
   useEffect(() => {
     if (!el.current) return;
-    const up = css("--color-up", "#2ee6a6"), down = css("--color-down", "#ff5c7a"), line = css("--color-line", "#1c2436"), accent = css("--color-accent", "#3d7bff");
+    const up = css("--color-up", "#2ee6a6"), down = css("--color-down", "#ff5c7a"), line = css("--color-line", "#1c2436"), accent = css("--color-accent-fg", "#3c8aff");
     const c = createChart(el.current, {
       autoSize: true,
       layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: css("--color-muted", "#8a93ab"), fontFamily: "var(--font-geist-mono)", fontSize: 11, attributionLogo: false },
@@ -68,9 +68,9 @@ function Chart({ pool, supply }: { pool: string; supply: number }) {
         ))}
         {supply > 0 && (
           <span className="ml-auto flex items-center gap-1 px-1.5 font-mono text-xs">
-            <button onClick={() => setMc(false)} className={!mc ? "text-accent" : "text-dim hover:text-fg"}>Price</button>
+            <button onClick={() => setMc(false)} className={!mc ? "text-accent-fg" : "text-dim hover:text-fg"}>Price</button>
             <span className="text-line-2">/</span>
-            <button onClick={() => setMc(true)} className={mc ? "text-accent" : "text-dim hover:text-fg"}>MC</button>
+            <button onClick={() => setMc(true)} className={mc ? "text-accent-fg" : "text-dim hover:text-fg"}>MC</button>
           </span>
         )}
       </div>
@@ -193,7 +193,7 @@ function PairView() {
                       <td className="px-3 py-2.5 text-right">${fmtPrice(r.priceUsd)}</td>
                       <td className="px-3 py-2.5 text-right">{fmtCompact(r.tokenAmount)} <span className="text-dim">{p.token.symbol}</span></td>
                       <td className="px-3 py-2.5 text-right">{fmtUsd(r.usd)}</td>
-                      <td className="px-3 py-2.5 text-right"><Link href={`/portfolio/?w=${r.from}`} className="text-muted hover:text-accent">{shortAddr(r.from)}</Link></td>
+                      <td className="px-3 py-2.5 text-right"><Link href={`/portfolio/?w=${r.from}`} className="text-muted hover:text-accent-fg">{shortAddr(r.from)}</Link></td>
                     </tr>
                   ))}
                 </tbody>

@@ -88,13 +88,13 @@ export default function ApiPage() {
             {([["Factory", ADDR.factory], ["Hook", ADDR.hook], ["Router", ADDR.router], ["PoolManager", ADDR.poolManager]] as const).map(([k, a]) => (
               <div key={k} className="mt-3">
                 <p className="text-xs text-dim">{k}</p>
-                <a href={EXPLORER ? `${EXPLORER}/address/${a}` : undefined} target="_blank" rel="noreferrer" className="break-all font-mono text-xs text-accent hover:underline">{a}</a>
+                <a href={EXPLORER ? `${EXPLORER}/address/${a}` : undefined} target="_blank" rel="noreferrer" className="break-all font-mono text-xs text-accent-fg hover:underline">{a}</a>
               </div>
             ))}
           </div>
           <div className="rounded-2xl border border-line bg-panel p-5 text-sm text-muted">
             <p className="font-semibold text-fg">Source</p>
-            <p className="mt-2">Contracts, indexer and this site are open source on <a href="https://github.com/keelfun/keelfun" target="_blank" rel="noreferrer" className="text-accent hover:underline">GitHub</a>.</p>
+            <p className="mt-2">Contracts, indexer and this site are open source on <a href="https://github.com/keelfun/keelfun" target="_blank" rel="noreferrer" className="text-accent-fg hover:underline">GitHub</a>.</p>
           </div>
         </aside>
       </div>

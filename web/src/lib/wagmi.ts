@@ -24,7 +24,7 @@ if (WC_PROJECT_ID) {
         url: "https://keelfun.app",
         icons: ["https://keelfun.app/icon.png"],
       },
-      qrModalOptions: { themeMode: "dark", themeVariables: { "--wcm-accent-color": "#3d7bff", "--wcm-z-index": "1000" } },
+      qrModalOptions: { themeMode: "dark", themeVariables: { "--wcm-accent-color": "#0000ff", "--wcm-z-index": "1000" } },
     }),
   );
 }

@@ -450,7 +450,7 @@ export default function LaunchPage() {
                 <div className="rounded-2xl border border-line bg-panel p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-medium">Creator funds recipient</p>
-                    <button type="button" onClick={() => setSplitMode(!split)} className="text-xs text-accent hover:underline">
+                    <button type="button" onClick={() => setSplitMode(!split)} className="text-xs text-accent-fg hover:underline">
                       {split ? "Use my wallet" : "Split between wallets"}
                     </button>
                   </div>
@@ -472,7 +472,7 @@ export default function LaunchPage() {
                       ))}
                       <div className="flex justify-between text-xs">
                         {splits.length < 4 ? (
-                          <button type="button" className="text-accent hover:underline" onClick={() => setSplits([...splits, { address: "", pct: "0" }])}>+ Add wallet</button>
+                          <button type="button" className="text-accent-fg hover:underline" onClick={() => setSplits([...splits, { address: "", pct: "0" }])}>+ Add wallet</button>
                         ) : (
                           <span />
                         )}
@@ -539,7 +539,7 @@ export default function LaunchPage() {
                 <p className="truncate text-lg font-semibold">{name || "Your token"}</p>
                 <p className="text-sm text-muted">{(symbol || "TOKEN").toUpperCase()}/{pair.symbol}</p>
               </div>
-              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">NEW</span>
+              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent-fg">NEW</span>
             </div>
             <p className="mt-4 line-clamp-3 text-sm text-fg/80">{description || "Fixed-supply token trading on a locked Uniswap v4 pool."}</p>
             <div className="mt-4 grid grid-cols-2 gap-4 text-sm">

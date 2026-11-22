@@ -240,7 +240,7 @@ export function AnySwap({ initialGet }: { initialGet?: string | null } = {}) {
         </div>
       </div>
       <div className="relative z-10 -my-3.5 flex justify-center">
-        <button aria-label="Switch direction" onClick={() => { setPay(get); setGet(pay); setAmount(""); setMsg(null); }} className="flex h-10 w-10 items-center justify-center rounded-xl border-4 border-panel bg-panel-2 text-lg text-muted transition-colors hover:text-accent">↓</button>
+        <button aria-label="Switch direction" onClick={() => { setPay(get); setGet(pay); setAmount(""); setMsg(null); }} className="flex h-10 w-10 items-center justify-center rounded-xl border-4 border-panel bg-panel-2 text-lg text-muted transition-colors hover:text-accent-fg">↓</button>
       </div>
       <div className="rounded-2xl bg-bg/70 p-4">
         <p className="text-xs text-dim">You receive</p>

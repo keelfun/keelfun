@@ -176,7 +176,7 @@ export default function BuildersPage() {
                 </tr>
               ))}
               {list.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-10 text-center text-sm text-muted">No builders yet. <a href="#join" className="text-accent hover:underline">Be the first.</a></td></tr>
+                <tr><td colSpan={4} className="px-4 py-10 text-center text-sm text-muted">No builders yet. <a href="#join" className="text-accent-fg hover:underline">Be the first.</a></td></tr>
               )}
             </tbody>
           </table>

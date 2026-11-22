@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", images: ["/og.png"], site: "@keelfunapp" },
 };
 
-export const viewport: Viewport = { themeColor: "#05070d", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#000000", width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

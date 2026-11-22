@@ -212,7 +212,7 @@ export function TradePanel({ token, defaultSide = "buy" }: { token: Token; defau
             setAmount("");
             setMsg(null);
           }}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border-4 border-panel bg-panel-2 text-lg text-muted transition-colors hover:text-accent"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border-4 border-panel bg-panel-2 text-lg text-muted transition-colors hover:text-accent-fg"
         >
           ↓
         </button>

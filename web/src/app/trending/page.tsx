@@ -87,7 +87,7 @@ export default function TrendingPage() {
             <button key={d} onClick={() => setDur(d)} className={`rounded-md px-2.5 py-1 font-mono text-xs ${dur === d ? "bg-panel-2 text-fg" : "text-dim hover:text-fg"}`}>{d}</button>
           ))}
         </div>
-        <button onClick={() => setCjk((v) => !v)} className={`h-8 rounded-lg border px-2.5 text-xs ${cjk ? "border-accent text-accent" : "border-line text-muted hover:text-fg"}`}>中 Chinese names</button>
+        <button onClick={() => setCjk((v) => !v)} className={`h-8 rounded-lg border px-2.5 text-xs ${cjk ? "border-accent text-accent-fg" : "border-line text-muted hover:text-fg"}`}>中 Chinese names</button>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Base tokens" className="h-8 w-48 rounded-lg border border-line bg-bg px-3 text-xs outline-none focus:border-accent" />
         <div className="ml-auto">
           <PresetBar />

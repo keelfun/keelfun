@@ -77,7 +77,7 @@ export default function AdminPage() {
         <dl className="mt-4 space-y-2 border-t border-line pt-4 text-sm">
           <div className="flex justify-between gap-4">
             <dt className="text-muted">Hook</dt>
-            <dd><a href={`${EXPLORER}/address/${ADDR.hook}`} target="_blank" rel="noreferrer" className="font-mono text-accent hover:underline">{ADDR.hook.slice(0, 8)}…{ADDR.hook.slice(-6)}</a></dd>
+            <dd><a href={`${EXPLORER}/address/${ADDR.hook}`} target="_blank" rel="noreferrer" className="font-mono text-accent-fg hover:underline">{ADDR.hook.slice(0, 8)}…{ADDR.hook.slice(-6)}</a></dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-muted">Owner</dt>

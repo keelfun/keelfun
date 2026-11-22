@@ -24,9 +24,9 @@ type Bar = { open: number; high: number; low: number; close: number; volume: num
 function Toggle({ a, b, on, set }: { a: string; b: string; on: boolean; set: (v: boolean) => void }) {
   return (
     <span className="flex items-center gap-1 px-1.5 font-mono text-xs">
-      <button onClick={() => set(true)} className={on ? "text-accent" : "text-dim hover:text-fg"}>{a}</button>
+      <button onClick={() => set(true)} className={on ? "text-accent-fg" : "text-dim hover:text-fg"}>{a}</button>
       <span className="text-line-2">/</span>
-      <button onClick={() => set(false)} className={!on ? "text-accent" : "text-dim hover:text-fg"}>{b}</button>
+      <button onClick={() => set(false)} className={!on ? "text-accent-fg" : "text-dim hover:text-fg"}>{b}</button>
     </span>
   );
 }
@@ -60,7 +60,7 @@ export function PriceChart({ t, ethUsd }: { t: Token; ethUsd: number }) {
     if (!el.current) return;
     const up = css("--color-up", "#2ee6a6");
     const down = css("--color-down", "#ff5c7a");
-    const accent = css("--color-accent", "#3d7bff");
+    const accent = css("--color-accent-fg", "#3c8aff");
     const line = css("--color-line", "#1c2436");
     const c = createChart(el.current, {
       autoSize: true,

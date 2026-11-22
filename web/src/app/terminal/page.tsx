@@ -97,12 +97,12 @@ function LaneControls({ lane, set }: { lane: Lane; set: (v: Partial<Lane>) => vo
     <div className="relative flex shrink-0 items-center gap-1">
       <div className="flex rounded-md border border-line p-0.5" title="Quick buy preset for this column">
         {[0, 1, 2].map((i) => (
-          <button key={i} onClick={() => set({ p: lane.p === i ? null : i })} className={`rounded px-1 font-mono text-[10px] ${lane.p === i ? "bg-panel-2 text-accent" : "text-dim hover:text-fg"}`}>
+          <button key={i} onClick={() => set({ p: lane.p === i ? null : i })} className={`rounded px-1 font-mono text-[10px] ${lane.p === i ? "bg-panel-2 text-accent-fg" : "text-dim hover:text-fg"}`}>
             P{i + 1}
           </button>
         ))}
       </div>
-      <button onClick={() => setOpen((v) => !v)} aria-label="Filters" className={`flex h-6 w-6 items-center justify-center rounded-md border ${laneActive(lane) ? "border-accent text-accent" : "border-line text-dim hover:text-fg"}`}>
+      <button onClick={() => setOpen((v) => !v)} aria-label="Filters" className={`flex h-6 w-6 items-center justify-center rounded-md border ${laneActive(lane) ? "border-accent text-accent-fg" : "border-line text-dim hover:text-fg"}`}>
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 5h18l-7 8v6l-4 2v-8z" /></svg>
       </button>
       {open && (

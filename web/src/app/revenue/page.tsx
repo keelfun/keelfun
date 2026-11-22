@@ -74,8 +74,8 @@ export default function RevenuePage() {
         </div>
         <div className="rounded-2xl border border-line bg-panel p-5 text-sm leading-relaxed text-muted sm:p-6">
           <h2 className="text-lg font-semibold text-fg">Where it goes</h2>
-          <p className="mt-3">Protocol fees are held by the hook contract{EXPLORER && <> (<a href={`${EXPLORER}/address/${ADDR.hook}`} target="_blank" rel="noreferrer" className="text-accent hover:underline">view on Basescan</a>)</>} and can only be withdrawn by the {BRAND} treasury.</p>
-          <p className="mt-3">The plan for that revenue, including buybacks, lives on the <Link href="/buyback/" className="text-accent hover:underline">Buyback</Link> page. Token-level buybacks run on the <Link href="/flywheel/" className="text-accent hover:underline">Flywheel</Link>.</p>
+          <p className="mt-3">Protocol fees are held by the hook contract{EXPLORER && <> (<a href={`${EXPLORER}/address/${ADDR.hook}`} target="_blank" rel="noreferrer" className="text-accent-fg hover:underline">view on Basescan</a>)</>} and can only be withdrawn by the {BRAND} treasury.</p>
+          <p className="mt-3">The plan for that revenue, including buybacks, lives on the <Link href="/buyback/" className="text-accent-fg hover:underline">Buyback</Link> page. Token-level buybacks run on the <Link href="/flywheel/" className="text-accent-fg hover:underline">Flywheel</Link>.</p>
           <p className="mt-3">Pair assets are valued at current prices, so totals move with ETH, stocks and memes.</p>
         </div>
       </section>

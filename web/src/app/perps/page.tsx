@@ -43,7 +43,7 @@ function Chart({ coin }: { coin: string }) {
   const { data } = useQuery({ queryKey: ["hl-candles", coin, tf], queryFn: () => fetchCandles(coin, TF[tf][0], TF[tf][1]), refetchInterval: 10000 });
   useEffect(() => {
     if (!el.current) return;
-    const up = css("--color-up", "#2ee6a6"), down = css("--color-down", "#ff5c7a"), line = css("--color-line", "#1c2436"), accent = css("--color-accent", "#3d7bff");
+    const up = css("--color-up", "#2ee6a6"), down = css("--color-down", "#ff5c7a"), line = css("--color-line", "#1c2436"), accent = css("--color-accent-fg", "#3c8aff");
     const c = createChart(el.current, {
       autoSize: true,
       layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: css("--color-muted", "#8a93ab"), fontFamily: "var(--font-geist-mono)", fontSize: 11, attributionLogo: false },
@@ -227,7 +227,7 @@ function OrderForm({ m, limitPx, setLimitPx }: { m: Market; limitPx: string; set
         <label className="flex items-center gap-2 rounded-lg border border-line bg-bg px-3 py-2 focus-within:border-accent">
           <span className="text-xs text-dim">Price</span>
           <input value={limitPx} onChange={(e) => setLimitPx(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder={px(m.mid)} className={input} />
-          <button onClick={() => setLimitPx(hlPx(m.mid, m.szDecimals))} className="text-[11px] text-accent">Mid</button>
+          <button onClick={() => setLimitPx(hlPx(m.mid, m.szDecimals))} className="text-[11px] text-accent-fg">Mid</button>
         </label>
       )}
       <label className="flex items-center gap-2 rounded-lg border border-line bg-bg px-3 py-2 focus-within:border-accent">
@@ -273,7 +273,7 @@ function OrderForm({ m, limitPx, setLimitPx }: { m: Market; limitPx: string; set
       {msg && <p className={`break-words text-xs ${msg.ok ? "text-up" : "text-down"}`}>{msg.t}</p>}
       <p className="text-[11px] leading-relaxed text-dim">
         Trades on your Hyperliquid account ({address ? shortAddr(address) : "connected wallet"}). Enable trading approves a Keelfun agent key, stored encrypted in your vault, that can place orders but cannot withdraw. Fund it with USDC on{" "}
-        <a href="https://app.hyperliquid.xyz/portfolio" target="_blank" rel="noreferrer" className="text-accent">Hyperliquid ↗</a>. Perps are high risk.
+        <a href="https://app.hyperliquid.xyz/portfolio" target="_blank" rel="noreferrer" className="text-accent-fg">Hyperliquid ↗</a>. Perps are high risk.
       </p>
     </div>
   );

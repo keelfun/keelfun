@@ -60,7 +60,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 function TokenCell({ t, sub }: { t: { address: string; image: string | null; symbol: string; name: string }; sub?: React.ReactNode }) {
   return (
-    <Link href={`/token/?a=${t.address}`} className="flex min-w-0 items-center gap-3 hover:text-accent">
+    <Link href={`/token/?a=${t.address}`} className="flex min-w-0 items-center gap-3 hover:text-accent-fg">
       <TokenAvatar src={t.image} symbol={t.symbol} size={36} />
       <div className="min-w-0">
         <p className="truncate text-sm">{t.name}</p>
@@ -138,7 +138,7 @@ function WalletBar({ current }: { current: string }) {
     go(a);
   };
   const chip = (on: boolean) =>
-    `flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs ${on ? "border-accent text-accent" : "border-line text-muted hover:text-fg"}`;
+    `flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs ${on ? "border-accent text-accent-fg" : "border-line text-muted hover:text-fg"}`;
   const vw = v.data?.wallets ?? [];
   return (
     <div className="mt-6 flex flex-wrap items-center gap-2">
@@ -160,7 +160,7 @@ function WalletBar({ current }: { current: string }) {
       ))}
       <form onSubmit={(e) => (e.preventDefault(), add())} className="flex h-8 items-center rounded-lg border border-line bg-bg/60 pl-2.5">
         <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Watch any address 0x…" className="w-52 sm:w-72 bg-transparent font-mono text-xs outline-none placeholder:text-dim" />
-        <button disabled={!isAddress(input.trim())} className="px-2.5 text-xs text-accent disabled:text-dim">+ Watch</button>
+        <button disabled={!isAddress(input.trim())} className="px-2.5 text-xs text-accent-fg disabled:text-dim">+ Watch</button>
       </form>
     </div>
   );
@@ -262,7 +262,7 @@ function PortfolioView() {
             ) : isLoading ? (
               <Empty><p className="text-dim">Loading…</p></Empty>
             ) : ready && !data.holdings.length ? (
-              <Empty><p className="text-dim">No holdings yet. <Link href="/" className="text-accent hover:underline">Explore markets →</Link></p></Empty>
+              <Empty><p className="text-dim">No holdings yet. <Link href="/" className="text-accent-fg hover:underline">Explore markets →</Link></p></Empty>
             ) : null}
           </div>
         </section>
@@ -328,7 +328,7 @@ function PortfolioView() {
                         <td className="py-3.5 text-right">{fmtCompact(r.tokens)}</td>
                         <td className="py-3.5 text-right">{amt(r.pairAmount ?? r.eth)} <span className="text-dim">{r.pair ? p.symbol : "ETH"}</span></td>
                         <td className="py-3.5 text-right">
-                          <a href={`${EXPLORER}/tx/${r.tx}`} target="_blank" rel="noreferrer" className="text-dim hover:text-accent">
+                          <a href={`${EXPLORER}/tx/${r.tx}`} target="_blank" rel="noreferrer" className="text-dim hover:text-accent-fg">
                             {timeAgo(r.ts)} ↗
                           </a>
                         </td>

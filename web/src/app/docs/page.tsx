@@ -54,7 +54,7 @@ export default function Docs() {
             <span className="text-sm text-muted">{k}</span>
             {DEPLOYED || k.startsWith("Uniswap") ? (
               EXPLORER ? (
-                <a href={`${EXPLORER}/address/${v}`} target="_blank" rel="noreferrer" className="break-all font-mono text-xs hover:text-accent">
+                <a href={`${EXPLORER}/address/${v}`} target="_blank" rel="noreferrer" className="break-all font-mono text-xs hover:text-accent-fg">
                   {v}
                 </a>
               ) : (

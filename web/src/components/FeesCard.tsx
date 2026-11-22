@@ -88,7 +88,7 @@ export function FeesCard({ t, ethUsd }: { t: Token; ethUsd: number }) {
     <div className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex items-baseline justify-between">
         <p className="text-sm">Taxes</p>
-        <p className="font-mono text-sm text-accent">
+        <p className="font-mono text-sm text-accent-fg">
           buy {t.buyBps / 100}% · sell {t.sellBps / 100}%
         </p>
       </div>
@@ -125,7 +125,7 @@ export function FeesCard({ t, ethUsd }: { t: Token; ethUsd: number }) {
         {row("Anti-snipe", t.antiSnipe ? "90% → 0 in 60s" : "off")}
         {row("Metadata", t.editable ? "editable by creator" : "locked")}
         {row("Total volume", fmtValue(t.volumeEth, ethUsd))}
-        {row("LP", <span className="text-accent">locked forever</span>)}
+        {row("LP", <span className="text-accent-fg">locked forever</span>)}
       </dl>
       {(address || c.burn > 0n) && (
         <div className="mt-3 space-y-2 border-t border-line pt-3">

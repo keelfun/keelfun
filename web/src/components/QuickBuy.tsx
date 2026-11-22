@@ -110,7 +110,7 @@ export function PresetBar({ compact = false }: { compact?: boolean }) {
           <p className="mb-2 text-xs font-semibold">Quick buy presets</p>
           {prefs.presets.map((p, i) => (
             <div key={i} className="mb-2 grid grid-cols-[28px_1fr_1fr] items-center gap-2 text-xs">
-              <span className={`font-mono ${prefs.active === i ? "text-accent" : "text-muted"}`}>P{i + 1}</span>
+              <span className={`font-mono ${prefs.active === i ? "text-accent-fg" : "text-muted"}`}>P{i + 1}</span>
               <label className="flex items-center gap-1 rounded-md border border-line bg-bg px-1.5 py-1">
                 <input value={p.amount} onChange={(e) => setPreset(i, { amount: e.target.value.replace(/[^0-9.]/g, "") })} inputMode="decimal" className="w-full bg-transparent font-mono outline-none" />
                 <span className="text-dim">ETH</span>
@@ -275,7 +275,7 @@ export function QuickSell({ meta }: { meta: TokenMeta }) {
       </div>
       {!v.data ? (
         <p className="text-xs text-dim">
-          Sells straight from your trading wallets, no popup. <Link href="/wallets/" className="text-accent hover:underline">{v.exists ? "Unlock wallets" : "Create a trading wallet"}</Link>
+          Sells straight from your trading wallets, no popup. <Link href="/wallets/" className="text-accent-fg hover:underline">{v.exists ? "Unlock wallets" : "Create a trading wallet"}</Link>
         </p>
       ) : (
         <div className="grid grid-cols-3 gap-2">

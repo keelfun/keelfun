@@ -1,21 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #05070d;
-  --color-panel: #0b0f1a;
-  --color-panel-2: #111727;
-  --color-line: #1c2436;
-  --color-line-2: #27314a;
-  --color-fg: #eef2ff;
-  --color-muted: #8a93ab;
-  --color-dim: #5b647c;
-  --color-accent: #3d7bff;
+  --color-bg: #000000;
+  --color-panel: #0a0b0d;
+  --color-panel-2: #121317;
+  --color-line: #1e2025;
+  --color-line-2: #2a2d33;
+  --color-fg: #ffffff;
+  --color-muted: #a3a7b0;
+  --color-dim: #6c707a;
+  --color-accent: #0000ff;
   --color-accent-ink: #ffffff;
   --color-up: #2ee6a6;
   --color-down: #ff5c7a;
   --color-warn: #ffb020;
-  --color-accent-2: #7fd4ff;
-  --color-accent-soft: #bcd3ff;
+  --color-accent-2: #3c8aff;
+  --color-accent-soft: #b4c8ff;
+  --color-accent-fg: #3c8aff;
 }
 
 @theme inline {
@@ -72,7 +73,7 @@ input[type="number"] {
 }
 
 .text-gradient {
-  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-2));
+  background: linear-gradient(90deg, var(--color-accent-fg), var(--color-accent-soft));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -129,6 +130,7 @@ input[type="number"] {
 }
 
 :root[data-theme="dark"] {
+  --color-accent-fg: var(--color-accent);
   --color-bg: #0a0a0b;
   --color-panel: #111113;
   --color-panel-2: #18181b;
@@ -140,6 +142,7 @@ input[type="number"] {
   --color-accent-ink: #06121f;
 }
 :root[data-theme="dusk"] {
+  --color-accent-fg: var(--color-accent);
   --color-bg: #070818;
   --color-panel: #0d0f24;
   --color-panel-2: #14173a;
@@ -151,6 +154,7 @@ input[type="number"] {
   --color-accent-ink: #ffffff;
 }
 :root[data-theme="astro"] {
+  --color-accent-fg: var(--color-accent);
   --color-bg: #0a0716;
   --color-panel: #120d24;
   --color-panel-2: #1a1433;
@@ -162,6 +166,7 @@ input[type="number"] {
   --color-accent-ink: #ffffff;
 }
 :root[data-theme="neo"] {
+  --color-accent-fg: var(--color-accent);
   --color-bg: #050a08;
   --color-panel: #0a1410;
   --color-panel-2: #101d17;
@@ -173,6 +178,7 @@ input[type="number"] {
   --color-accent-ink: #04140c;
 }
 :root[data-theme="crimson"] {
+  --color-accent-fg: var(--color-accent);
   --color-bg: #0a0606;
   --color-panel: #140c0c;
   --color-panel-2: #1d1212;

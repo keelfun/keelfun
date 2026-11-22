@@ -77,7 +77,7 @@ export default function TradersPage() {
             {DD.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
         </label>
-        <button onClick={() => setBots((v) => !v)} className={`h-7 rounded-lg border px-2.5 text-xs ${bots ? "border-line text-muted hover:text-fg" : "border-accent text-accent"}`}>
+        <button onClick={() => setBots((v) => !v)} className={`h-7 rounded-lg border px-2.5 text-xs ${bots ? "border-line text-muted hover:text-fg" : "border-accent text-accent-fg"}`}>
           {bots ? "Bots shown" : "Bots hidden"}
         </button>
         <span className="ml-auto text-xs text-dim">{dataUpdatedAt ? `Updated ${timeAgo(Math.floor(dataUpdatedAt / 1000))} ago` : ""}</span>
@@ -108,7 +108,7 @@ export default function TradersPage() {
                 <tr key={t.wallet} className="border-b border-line/60 last:border-0 hover:bg-panel-2/50">
                   <td className="px-3 py-3 text-muted">{i + 1}</td>
                   <td className="px-3 py-3">
-                    <Link href={`/portfolio/?w=${t.wallet}`} className="flex items-center gap-2.5 hover:text-accent">
+                    <Link href={`/portfolio/?w=${t.wallet}`} className="flex items-center gap-2.5 hover:text-accent-fg">
                       <Ident a={t.wallet} />
                       <span>
                         <span className="block">{shortAddr(t.wallet)}</span>
@@ -142,7 +142,7 @@ export default function TradersPage() {
                   </td>
                   <td className="px-3 py-3 text-right text-muted">{timeAgo(t.lastTs)}</td>
                   <td className="px-3 py-3 text-right">
-                    <button onClick={() => track(t.wallet)} className={`rounded-md border px-2 py-1 font-sans text-xs ${tracked.includes(t.wallet) ? "border-accent text-accent" : "border-line text-muted hover:text-fg"}`}>
+                    <button onClick={() => track(t.wallet)} className={`rounded-md border px-2 py-1 font-sans text-xs ${tracked.includes(t.wallet) ? "border-accent text-accent-fg" : "border-line text-muted hover:text-fg"}`}>
                       {tracked.includes(t.wallet) ? "Tracking" : "Track"}
                     </button>
                   </td>

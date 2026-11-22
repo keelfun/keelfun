@@ -195,7 +195,7 @@ export default function Home() {
       ) : (
         <div className="rounded-2xl border border-dashed border-line-2 py-16 text-center">
           <p className="text-sm text-muted">{q ? "No tokens match that search." : "No tokens here yet."}</p>
-          <Link href="/launch/" className="mt-3 inline-block text-sm text-accent hover:underline">
+          <Link href="/launch/" className="mt-3 inline-block text-sm text-accent-fg hover:underline">
             Be the first to launch →
           </Link>
         </div>

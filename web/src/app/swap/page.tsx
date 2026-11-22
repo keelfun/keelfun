@@ -47,7 +47,7 @@ function SwapView() {
           </div>
           {addr && one?.token ? (
             <>
-              <Link href="/swap/" className="inline-block text-sm text-accent hover:underline">← Swap any token</Link>
+              <Link href="/swap/" className="inline-block text-sm text-accent-fg hover:underline">← Swap any token</Link>
               <TradePanel token={one.token} />
             </>
           ) : (
@@ -66,7 +66,7 @@ function SwapView() {
                 </div>
               </div>
               {t.description && <p className="mt-3 line-clamp-3 text-sm text-muted">{t.description}</p>}
-              <Link href={`/token/?a=${t.address}`} className="mt-3 inline-block text-sm text-accent hover:underline">Chart, holders and trades →</Link>
+              <Link href={`/token/?a=${t.address}`} className="mt-3 inline-block text-sm text-accent-fg hover:underline">Chart, holders and trades →</Link>
             </div>
           )}
           <div className="rounded-2xl border border-line bg-panel p-4">
