@@ -1240,6 +1240,7 @@ async function detectLaunchpads(rpc: Rpc, addrs: string[]) {
     else if (v.owner?.toLowerCase() === DOPPLER_AIRLOCK) lp = typeof provider === "string" && /^[a-z0-9 ._-]{2,20}$/i.test(provider) ? provider.toLowerCase() : "doppler";
     else if (v.owner?.toLowerCase() === VIRTUALS_FACTORY) lp = "virtuals";
     else if (v.factory && CLANKER_FACTORIES.has(v.factory.toLowerCase())) lp = "clanker";
+    else if (a.startsWith("0xb20000000000000000000")) lp = "o1";
     out[a] = { lp, image };
   }));
   const unknown = addrs.filter((a) => !out[a].lp).slice(0, 8);

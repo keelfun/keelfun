@@ -47,8 +47,10 @@ export function useTokenMeta(address: string) {
   return useQuery({ queryKey: ["tmeta", a], queryFn: () => loadMeta(a), staleTime: 3600_000, gcTime: 3600_000, retry: false }).data;
 }
 
-export function launchpadOf(dex: string, m?: TokenMeta) {
-  return m?.lp ?? DEX_LP[dex] ?? null;
+const O1_PREFIX = "0xb20000000000000000000";
+
+export function launchpadOf(dex: string, m?: TokenMeta, address = "") {
+  return m?.lp ?? DEX_LP[dex] ?? (address.toLowerCase().startsWith(O1_PREFIX) ? "o1" : null);
 }
 
 export function LaunchpadChip({ id }: { id: string }) {
@@ -63,7 +65,7 @@ export function LaunchpadChip({ id }: { id: string }) {
 
 export function PoolAvatar({ token, dex, dexLabel, size }: { token: { address: string; symbol: string; image: string | null }; dex: string; dexLabel: string; size: number }) {
   const m = useTokenMeta(token.address);
-  const lp = launchpadOf(dex, m);
+  const lp = launchpadOf(dex, m, token.address);
   return (
     <div className="relative shrink-0">
       <TokenAvatar src={token.image ?? m?.image} symbol={token.symbol} size={size} />
@@ -77,5 +79,5 @@ export function PoolAvatar({ token, dex, dexLabel, size }: { token: { address: s
 }
 
 export function useLaunchpad(address: string, dex: string) {
-  return launchpadOf(dex, useTokenMeta(address));
+  return launchpadOf(dex, useTokenMeta(address), address);
 }
