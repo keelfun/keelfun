@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { erc20Abi, formatUnits } from "viem";
 import { getQuote, ETH } from "@/components/AnySwap";
 import { api, type Portfolio } from "./api";
+import { tokenPrices } from "./basePools";
 import { launchRouterAbi } from "./abis";
 import { ADDR } from "./config";
 import { vaultActions, vaultClient, vaultPublic, type TokenMeta, type VaultWallet } from "./vault";
@@ -26,18 +27,6 @@ async function relayTokens(user: string): Promise<TokenMeta[]> {
   }
 }
 
-async function prices(addrs: string[]): Promise<Record<string, number>> {
-  const out: Record<string, number> = {};
-  for (let i = 0; i < addrs.length; i += 30) {
-    try {
-      const r = await fetch(`https://api.geckoterminal.com/api/v2/simple/networks/base/token_price/${addrs.slice(i, i + 30).join(",")}`);
-      const j = await r.json();
-      for (const [k, v] of Object.entries(j?.data?.attributes?.token_prices ?? {})) out[k.toLowerCase()] = Number(v) || 0;
-    } catch {}
-  }
-  return out;
-}
-
 export function useVaultHoldings(w: VaultWallet, tracked: TokenMeta[]) {
   return useQuery({
     queryKey: ["vault-holdings", w.address, tracked.length],
@@ -52,7 +41,7 @@ export function useVaultHoldings(w: VaultWallet, tracked: TokenMeta[]) {
       const pub = vaultPublic();
       const bals = await pub.multicall({ contracts: metas.map((m) => ({ address: m.address, abi: erc20Abi, functionName: "balanceOf", args: [w.address] }) as const), allowFailure: true });
       const held = metas.map((meta, i) => ({ meta, raw: (bals[i].result as bigint | undefined) ?? 0n })).filter((h) => h.raw > 0n);
-      const px = await prices(held.filter((h) => !h.meta.keel).map((h) => h.meta.address.toLowerCase()));
+      const px = await tokenPrices(held.filter((h) => !h.meta.keel).map((h) => h.meta.address.toLowerCase()));
       const keelUsd = Object.fromEntries((pf?.holdings ?? []).map((h) => [h.token.address.toLowerCase(), h.amount ? h.valueUsd / h.amount : 0]));
       return held
         .map((h) => {

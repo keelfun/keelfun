@@ -1,3 +1,5 @@
+import { erc20Abi } from "viem";
+import { vaultPublic } from "./vault";
 export type BasePool = {
   pool: string; dex: string; createdAt: number; quote: string;
   token: { address: string; symbol: string; name: string; image: string | null; decimals: number };
@@ -16,38 +18,116 @@ type GtPool = { attributes: Record<string, any>; relationships: Record<string, {
 const num = (v: unknown) => (v == null ? 0 : Number(v) || 0);
 
 const inflight = new Map<string, Promise<unknown>>();
-async function gt<T>(path: string): Promise<T> {
-  const key = `gt:${path}`;
-  let cached: { t: number; v: T } | null = null;
+const ttl = (path: string) => (path.includes("/ohlcv/") ? 60_000 : path.endsWith("/trades") ? 20_000 : path.includes("/pools/") ? 30_000 : 45_000);
+const LIMIT = 24; // GeckoTerminal free tier is ~30 req/min per IP; stay under it across all tabs
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function store<T>(k: string): T | null {
   try {
-    cached = JSON.parse(sessionStorage.getItem(key) || "null");
-  } catch {}
-  if (cached && Date.now() - cached.t < 15_000) return cached.v;
+    return JSON.parse(localStorage.getItem(k) || "null");
+  } catch {
+    return null;
+  }
+}
+function put(k: string, v: unknown) {
+  try {
+    localStorage.setItem(k, JSON.stringify(v));
+  } catch {
+    for (const x of Object.keys(localStorage)) if (x.startsWith("gt:/")) localStorage.removeItem(x);
+  }
+}
+/** Waits for a slot in the shared per-minute budget; false if none frees up soon. */
+async function slot(): Promise<boolean> {
+  for (let i = 0; i < 4; i++) {
+    const now = Date.now();
+    if ((store<number>("gt:backoff") ?? 0) > now) return false;
+    const recent = (store<number[]>("gt:calls") ?? []).filter((t) => now - t < 60_000);
+    if (recent.length < LIMIT) {
+      put("gt:calls", [...recent, now]);
+      return true;
+    }
+    await sleep(Math.min(3000, recent[0] + 60_000 - now));
+  }
+  return false;
+}
+
+async function gt<T>(path: string, fallback?: () => Promise<T>): Promise<T> {
+  const key = `gt:${path}`;
+  const cached = store<{ t: number; v: T }>(key);
+  if (cached && Date.now() - cached.t < ttl(path)) return cached.v;
   if (inflight.has(path)) return inflight.get(path) as Promise<T>;
   const job = (async () => {
     let r: Response | null = null;
-    try {
-      r = await fetch(`${GT}${path}`, { headers: { accept: "application/json" } });
-    } catch {}
+    if (await slot()) {
+      try {
+        r = await fetch(`${GT}${path}`, { headers: { accept: "application/json" } });
+      } catch {}
+      if (r?.status === 429) put("gt:backoff", Date.now() + 30_000);
+    }
     if (!r?.ok) {
+      if (fallback) {
+        try {
+          const v = await fallback();
+          put(key, { t: Date.now(), v });
+          return v;
+        } catch {}
+      }
       if (cached) return cached.v;
       throw new Error(!r || r.status === 429 ? "Rate limited, retrying…" : r.status === 404 ? "Not found" : "Data source busy, retrying…");
     }
     const v = (await r.json()) as T;
-    try {
-      sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), v }));
-    } catch {}
+    put(key, { t: Date.now(), v });
     return v;
   })().finally(() => inflight.delete(path));
   inflight.set(path, job);
   return job;
 }
 
+/* DexScreener (300 req/min) as a fallback when GeckoTerminal is rate limited. */
+const DS = "https://api.dexscreener.com";
+type DsPair = Record<string, any>;
+async function ds<T>(path: string): Promise<T> {
+  const r = await fetch(`${DS}${path}`);
+  if (!r.ok) throw new Error(`dexscreener ${r.status}`);
+  return r.json();
+}
+/** Converts DexScreener pairs into the GeckoTerminal list shape so normalize() handles both. */
+function dsToGt(pairs: DsPair[]): GtList {
+  const included: { id: string; attributes: Record<string, any> }[] = [];
+  const data = pairs
+    .filter((p) => p.chainId === "base")
+    .map((p): GtPool => {
+      const bt = p.baseToken ?? {};
+      const qt = p.quoteToken ?? {};
+      const bid = `base_${String(bt.address).toLowerCase()}`;
+      const qid = `base_${String(qt.address).toLowerCase()}`;
+      included.push({ id: bid, attributes: { address: bt.address, symbol: bt.symbol, name: bt.name, image_url: p.info?.imageUrl ?? null } });
+      included.push({ id: qid, attributes: { address: qt.address, symbol: qt.symbol, name: qt.name, image_url: null } });
+      const lbl = (p.labels?.[0] ?? "").toLowerCase();
+      const dex = p.dexId === "uniswap" && lbl ? `uniswap-${lbl}-base` : p.dexId === "aerodrome" ? "aerodrome-base" : String(p.dexId);
+      return {
+        attributes: {
+          address: String(p.pairAddress).toLowerCase(),
+          name: `${bt.symbol} / ${qt.symbol}`,
+          pool_created_at: p.pairCreatedAt ? new Date(p.pairCreatedAt).toISOString() : null,
+          base_token_price_usd: p.priceUsd,
+          market_cap_usd: p.marketCap,
+          fdv_usd: p.fdv,
+          reserve_in_usd: p.liquidity?.usd,
+          volume_usd: p.volume,
+          price_change_percentage: p.priceChange,
+          transactions: p.txns,
+        },
+        relationships: { base_token: { data: { id: bid } }, quote_token: { data: { id: qid } }, dex: { data: { id: dex } } },
+      };
+    });
+  return { data, included };
+}
+
 type GtList = { data?: GtPool[]; included?: { id: string; attributes: Record<string, any> }[] };
 
 export async function fetchBasePools(kind: string, q = "", duration = "1h"): Promise<BasePool[]> {
   const path = q ? `/search/pools?query=${encodeURIComponent(q)}&network=base&include=base_token,dex` : `${PATHS[kind]}${kind === "trending" ? `&duration=${duration}` : ""}`;
-  return normalize(await gt<GtList>(path));
+  return normalize(await gt<GtList>(path, q ? async () => dsToGt((await ds<{ pairs?: DsPair[] }>(`/latest/dex/search?q=${encodeURIComponent(q)}`)).pairs ?? []) : undefined));
 }
 
 function normalize(j: GtList): BasePool[] {
@@ -91,7 +171,13 @@ function normalize(j: GtList): BasePool[] {
 export type PoolDetail = BasePool & { quoteAddress: string; quoteImage: string | null; feePct: number; lockedPct: number | null; vol1h: number; vol6h: number; buys1h: number; sells1h: number };
 
 export async function fetchPool(pool: string): Promise<PoolDetail> {
-  const j = await gt<{ data: GtPool; included?: { id: string; attributes: Record<string, any> }[] }>(`/networks/base/pools/${pool}?include=base_token,quote_token,dex`);
+  const j = await gt<{ data: GtPool; included?: { id: string; attributes: Record<string, any> }[] }>(`/networks/base/pools/${pool}?include=base_token,quote_token,dex`, async () => {
+    const l = dsToGt((await ds<{ pairs?: DsPair[] }>(`/latest/dex/pairs/base/${pool}`)).pairs ?? []);
+    if (!l.data?.length) throw new Error("Not found");
+    const bt = l.included?.find((x) => x.id === l.data![0].relationships.base_token?.data?.id);
+    if (bt) bt.attributes.decimals = await vaultPublic().readContract({ address: bt.attributes.address, abi: erc20Abi, functionName: "decimals" }).catch(() => 18);
+    return { data: l.data[0], included: l.included };
+  });
   const [base] = normalize({ data: [j.data], included: j.included });
   const a = j.data.attributes;
   const qid = j.data.relationships.quote_token?.data?.id ?? "";
@@ -134,7 +220,9 @@ export async function fetchPoolTrades(pool: string, token: string): Promise<Pool
 }
 
 export async function fetchTokenTopPool(token: string): Promise<string | null> {
-  const j = await gt<GtList>(`/networks/base/tokens/${token}/pools?page=1`);
+  const j = await gt<GtList>(`/networks/base/tokens/${token}/pools?page=1`, async () =>
+    dsToGt((await ds<DsPair[]>(`/token-pairs/v1/base/${token}`)).sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))),
+  );
   return j.data?.[0]?.attributes.address ?? null;
 }
 
@@ -142,3 +230,19 @@ export const DEX_LABEL: Record<string, string> = {
   "uniswap-v4-base": "Uni v4", "uniswap-v3-base": "Uni v3", "uniswap-v2-base": "Uni v2", "aerodrome-base": "Aero",
   "aero-slipstream-base": "Aero CL", "pancakeswap-v3-base": "Pancake", "sushiswap-v3-base": "Sushi", "baseswap": "BaseSwap",
 };
+
+/** USD prices for Base tokens (DexScreener, highest-liquidity pair per token). */
+export async function tokenPrices(addrs: string[]): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  const liq: Record<string, number> = {};
+  for (let i = 0; i < addrs.length; i += 30) {
+    try {
+      for (const p of await ds<DsPair[]>(`/tokens/v1/base/${addrs.slice(i, i + 30).join(",")}`)) {
+        const a = String(p.baseToken?.address).toLowerCase();
+        const l = p.liquidity?.usd ?? 0;
+        if (addrs.includes(a) && l >= (liq[a] ?? -1)) (liq[a] = l), (out[a] = Number(p.priceUsd) || 0);
+      }
+    } catch {}
+  }
+  return out;
+}
