@@ -226,7 +226,7 @@ function Row({ t, ethUsd, amount, buy }: { t: Token; ethUsd: number; amount: str
           </div>
         </div>
       </div>
-      <div className="mt-2 flex items-center gap-3 font-mono text-[11px] text-dim">
+      <div className="mt-2 flex items-center gap-2 overflow-hidden whitespace-nowrap font-mono text-[11px] text-dim sm:gap-3">
         <span>LIQ <span className="text-muted">{usd(t.liquidityEth)}</span></span>
         <span>VOL <span className="text-muted">{usd(t.volume24hEth)}</span></span>
         <span>TXNS <span className="text-muted">{t.trades}</span></span>
@@ -367,7 +367,7 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
           </div>
         </div>
       </div>
-      <div className="mt-2 flex items-center gap-3 font-mono text-[11px] text-dim">
+      <div className="mt-2 flex items-center gap-2 overflow-hidden whitespace-nowrap font-mono text-[11px] text-dim sm:gap-3">
         <span>LIQ <span className="text-muted">{fmtUsd(p.liqUsd)}</span></span>
         <span>VOL <span className="text-muted">{fmtUsd(p.vol24)}</span></span>
         <span>TXNS <span className="text-muted">{fmtCompact(p.buys + p.sells, 1)}</span> <span className="text-up">{fmtCompact(p.buys, 1)}</span>/<span className="text-down">{fmtCompact(p.sells, 1)}</span></span>

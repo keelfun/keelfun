@@ -26,7 +26,7 @@ export const LAUNCHPADS: Record<string, { name: string; site: string }> = {
 };
 const DEX_LP: Record<string, string> = {
   bankr: "bankr", "o1-launchpad": "o1", "virtuals-base": "virtuals", "virtuals-unicorn-base": "virtuals", "mint-club-base": "mintclub", "baseline-base": "baseline",
-  "pump-fun": "pump", pumpswap: "pump", "raydium-launchlab": "launchlab", moonshot: "moonshot", "meteora-dbc": "believe",
+  "pump-fun": "pump", pumpfun: "pump", pumpswap: "pump", "raydium-launchlab": "launchlab", moonshot: "moonshot", "meteora-dbc": "believe",
 };
 export const lpIcon = (id: string) => `https://www.google.com/s2/favicons?domain=${LAUNCHPADS[id]?.site ?? `${id}.com`}&sz=64`;
 
