@@ -11,7 +11,7 @@ import { CandlestickSeries, ColorType, createChart, HistogramSeries, type IChart
 import { AnySwap } from "@/components/AnySwap";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { api, type Token } from "@/lib/api";
-import { DEX_LABEL, fetchOhlcv, fetchPool, fetchPoolTrades, fetchTokenTopPool, type PoolDetail } from "@/lib/basePools";
+import { dexLabel, fetchOhlcv, fetchPool, fetchPoolTrades, fetchTokenTopPool, type PoolDetail } from "@/lib/basePools";
 import { explorerToken, getNet, NETS, parseNet, setNet } from "@/lib/net";
 import { fmtCompact, fmtPrice, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
 
@@ -140,7 +140,7 @@ function PairView() {
               <button onClick={() => navigator.clipboard.writeText(p.token.address).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1000)))} className="font-mono hover:text-fg" title="Copy contract address">
                 {copied ? "copied" : shortAddr(p.token.address)} ⧉
               </button>
-              <span className="rounded border border-line px-1.5">{DEX_LABEL[p.dex] ?? p.dex}</span>
+              <span className="rounded border border-line px-1.5">{dexLabel(p.dex)}</span>
               <span className="flex items-center gap-1 rounded border border-line px-1.5"><img src={NETS[net].logo} alt="" className="h-3 w-3 rounded-full" />{NETS[net].label}</span>
               <a href={explorerToken(net, p.token.address)} target="_blank" rel="noreferrer" className="hover:text-fg">{NETS[net].explorerName} ↗</a>
               <a href={`https://dexscreener.com/${NETS[net].ds}/${p.pool}`} target="_blank" rel="noreferrer" className="hover:text-fg">DexScreener ↗</a>

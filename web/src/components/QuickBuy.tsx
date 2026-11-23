@@ -72,7 +72,7 @@ export function PresetBar({ compact = false }: { compact?: boolean }) {
     <div className="relative flex flex-wrap items-center gap-1.5">
       {!compact && <span className="hidden text-xs text-muted sm:inline">Quick buy</span>}
       {!compact && (
-        <div className="flex rounded-lg border border-line p-0.5" title={v.data ? "Split the amount across wallets, or buy the full amount with each" : "Unlock the vault to choose wallets"}>
+        <div className="hidden rounded-lg border border-line p-0.5 sm:flex" title={v.data ? "Split the amount across wallets, or buy the full amount with each" : "Unlock the vault to choose wallets"}>
           {(["total", "each"] as const).map((m) => (
             <button key={m} disabled={!v.data} onClick={() => vaultActions.setMode(m)} className={`rounded-md px-2 py-0.5 text-[11px] capitalize ${(v.data?.mode ?? "total") === m ? "bg-panel-2 text-fg" : "text-dim hover:text-fg"} disabled:cursor-not-allowed`}>
               {m}
@@ -109,6 +109,18 @@ export function PresetBar({ compact = false }: { compact?: boolean }) {
       </button>
       {open && (
         <div className="absolute right-0 top-10 z-40 w-64 rounded-xl border border-line bg-panel p-3 shadow-2xl">
+          {!compact && (
+            <div className="mb-3 flex items-center gap-2 text-xs sm:hidden">
+              <span className="font-semibold">Wallet split</span>
+              <div className="ml-auto flex rounded-lg border border-line p-0.5">
+                {(["total", "each"] as const).map((m) => (
+                  <button key={m} disabled={!v.data} onClick={() => vaultActions.setMode(m)} className={`rounded-md px-2 py-0.5 text-[11px] capitalize ${(v.data?.mode ?? "total") === m ? "bg-panel-2 text-fg" : "text-dim hover:text-fg"} disabled:cursor-not-allowed`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <p className="mb-2 text-xs font-semibold">Quick buy presets</p>
           {prefs.presets.map((p, i) => (
             <div key={i} className="mb-2 grid grid-cols-[28px_1fr_1fr] items-center gap-2 text-xs">

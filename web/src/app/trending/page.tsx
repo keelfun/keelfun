@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { baseMeta, Bolt, PresetBar, RowSell, usePrefs, useRelayBuy } from "@/components/QuickBuy";
 import { LaunchpadChip, PoolAvatar, useLaunchpad } from "@/components/PoolAvatar";
-import { DEX_LABEL, fetchBasePools, fetchPoolsByAddr, fetchPoolsByToken, type BasePool } from "@/lib/basePools";
+import { dexLabel, fetchBasePools, fetchPoolsByAddr, fetchPoolsByToken, type BasePool } from "@/lib/basePools";
 import { useSet } from "@/lib/sets";
 import { addrOnNet, NETS, pairHref, useNet } from "@/lib/net";
 import { fmtCompact, fmtPrice, fmtUsd, timeAgo } from "@/lib/format";
@@ -121,7 +121,7 @@ export default function TrendingPage() {
               <tr key={p.pool} className="border-b border-line/60 last:border-0 hover:bg-panel-2/50">
                 <td className="px-3 py-2.5">
                   <Link href={pairHref(p.pool, p.net)} className="flex items-center gap-2 sm:gap-3">
-                    <PoolAvatar net={p.net} token={p.token} dex={p.dex} dexLabel={DEX_LABEL[p.dex] ?? p.dex.replace(/-(base|ethereum|eth|solana)$/, "").slice(0, 8)} size={44} />
+                    <PoolAvatar net={p.net} token={p.token} dex={p.dex} dexLabel={dexLabel(p.dex)} size={44} />
                     <div className="min-w-0 max-w-[8.5rem] sm:max-w-none">
                       <p className="truncate"><b>{p.token.symbol}</b> <span className="hidden text-xs text-dim sm:inline">{p.token.name}</span></p>
                       <p className="truncate text-xs text-muted"><span className="text-up">{p.createdAt ? timeAgo(p.createdAt) : "—"}</span> · /{p.quote} <Lp p={p} /></p>

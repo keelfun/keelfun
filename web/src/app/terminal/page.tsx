@@ -7,7 +7,7 @@ import { TokenAvatar } from "@/components/TokenAvatar";
 import { Tracker } from "@/components/Tracker";
 import { LaunchpadChip, PoolAvatar, useLaunchpad } from "@/components/PoolAvatar";
 import { api, useTokens, type Portfolio, type Token } from "@/lib/api";
-import { fetchBasePools, type BasePool } from "@/lib/basePools";
+import { dexLabel, fetchBasePools, type BasePool } from "@/lib/basePools";
 import { pairInfo } from "@/lib/config";
 import { explorerToken, NETS, normAddr, pairHref, useNet, type Net } from "@/lib/net";
 import { fmtCompact, fmtPct, fmtPrice, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
@@ -25,11 +25,6 @@ const BASE_COLS = [
 ] as const;
 
 
-
-const DEX: Record<string, string> = {
-  "uniswap-v4-base": "Uni v4", "uniswap-v3-base": "Uni v3", "uniswap-v2-base": "Uni v2", "aerodrome-base": "Aero", "aerodrome-slipstream": "Aero CL",
-  "aero-slipstream-base": "Aero CL", "pancakeswap-v3-base": "Pancake", "sushiswap-v3-base": "Sushi", "baseswap": "BaseSwap",
-};
 
 const SETS_EVT = "keel-sets";
 function readSet(key: string): string[] {
@@ -207,7 +202,6 @@ function Row({ t, ethUsd, amount, buy }: { t: Token; ethUsd: number; amount: str
               {t.holders}
             </span>
             {t.antiSnipe && <span className="text-[10px] text-warn">anti-snipe</span>}
-            <RowTools address={t.address} symbol={t.symbol} />
             </div>
             <button
               onClick={native ? go : undefined}
@@ -221,13 +215,14 @@ function Row({ t, ethUsd, amount, buy }: { t: Token; ethUsd: number; amount: str
             </button>
             <RowSell meta={keelMeta(t)} />
           </div>
-          <div className="mt-1.5 flex flex-wrap gap-1">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1">
             <span className={`${chip} ${t.change24h >= 0 ? "border-up/40 text-up" : "border-down/40 text-down"}`}>{fmtPct(t.change24h)}</span>
             <span className={`${chip} border-line text-muted`} title="Creator / holders / burn split">
               {t.creatorBps / 100}/{t.holdersBps / 100}/{t.burnBps / 100}
             </span>
             {burnPct > 0 && <span className={`${chip} border-warn/40 text-warn`}>🔥 {(burnPct * 100).toFixed(2)}%</span>}
             {!t.editable && <span className={`${chip} border-up/40 text-up`}>immutable</span>}
+            <span className="ml-auto"><RowTools address={t.address} symbol={t.symbol} /></span>
           </div>
         </div>
       </div>
@@ -314,7 +309,7 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
     <Link href={pairHref(p.pool, p.net)} className="group block border-b border-line px-3 py-2.5 transition-colors hover:bg-panel-2/60">
       <div className="flex gap-3">
         <div className="relative shrink-0">
-          <PoolAvatar net={p.net} token={t} dex={p.dex} dexLabel={DEX[p.dex] ?? p.dex.replace(/-(base|ethereum|eth|solana)$/, "").slice(0, 8)} size={52} />
+          <PoolAvatar net={p.net} token={t} dex={p.dex} dexLabel={dexLabel(p.dex)} size={52} />
           <p className="mt-1.5 text-center font-mono text-[10px] text-dim">{t.address.slice(0, 4)}…{t.address.slice(-3)}</p>
         </div>
         <div className="min-w-0 flex-1">
@@ -339,17 +334,6 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
               <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="8" r="3.5" /><path d="M2 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5" /></svg>
               {fmtCompact(p.traders, 1)}
             </span>
-            <a
-              href={`https://www.geckoterminal.com/${NETS[p.net].gt}/pools/${p.pool}`}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-dim hover:text-fg"
-              title="Chart"
-            >
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 3v18h18" /><path d="m7 14 4-4 3 3 5-6" /></svg>
-            </a>
-            <RowTools address={t.address} symbol={t.symbol} net={p.net} />
             </div>
             <button
               onClick={go}
@@ -363,10 +347,23 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
             </button>
             <RowSell meta={baseMeta(t)} />
           </div>
-          <div className="mt-1.5 flex flex-wrap gap-1">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1">
             {pctChip(p.chg5m, "5m")}
             {pctChip(p.chg1h, "1h")}
             {pctChip(p.chg24, "24h")}
+            <span className="ml-auto flex items-center gap-2">
+            <a
+              href={`https://www.geckoterminal.com/${NETS[p.net].gt}/pools/${p.pool}`}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-dim hover:text-fg"
+              title="Chart"
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 3v18h18" /><path d="m7 14 4-4 3 3 5-6" /></svg>
+            </a>
+            <RowTools address={t.address} symbol={t.symbol} net={p.net} />
+            </span>
           </div>
         </div>
       </div>
@@ -415,7 +412,7 @@ function BaseColumn({ sort, title, buy, hidden, view }: ColProps<BasePool>) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder={`Search ${NETS[net].label}`}
+          placeholder="Search"
           className="ml-auto h-7 w-24 min-w-0 rounded-md border border-line bg-bg px-2 text-xs outline-none focus:border-accent"
         />
         <LaneControls lane={lane} set={setLane} />
@@ -465,26 +462,8 @@ export default function TerminalPage() {
     localStorage.setItem("keel-pulse-cols", JSON.stringify(n));
     if (!n[tab]) setTab(n.findIndex(Boolean));
   };
-  return (
-    <div className="relative left-1/2 -mb-20 flex h-[calc(100dvh-8.5rem)] w-screen -translate-x-1/2 flex-col border-t border-line lg:h-[calc(100dvh-5.5rem)]">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-3 py-2">
-        {!tracker && (
-          <button onClick={() => setTracker(true)} className="hidden h-8 rounded-md border border-line px-2 text-xs text-muted hover:text-fg xl:block">Wallet tracker</button>
-        )}
-        <h1 className="text-base font-bold italic">Pulse</h1>
-        <span className="flex items-center gap-1.5 text-xs text-up"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />live</span>
-        <div className="flex rounded-lg border border-line p-0.5 text-xs">
-          {([["base", `All ${NETS[net].label}`], ...(net === "base" ? [["keel", "Keelfun"]] : [])] as ["base" | "keel", string][]).map(([k, l]) => (
-            <button key={k} onClick={() => setSrc(k)} className={`rounded-md px-2.5 py-1 ${src === k ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}>{l}</button>
-          ))}
-        </div>
-        <div className="flex rounded-lg border border-line p-0.5 text-xs">
-          {([["all", "All"], ["watch", `★ ${watch.length}`]] as const).map(([k, l]) => (
-            <button key={k} onClick={() => setView(k)} className={`rounded-md px-2.5 py-1 ${view === k ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}>{l}</button>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <div className="relative">
+  const display = (
+    <div className="relative">
             <button onClick={() => setDisp((v) => !v)} className={`h-8 rounded-md border px-2.5 text-xs ${disp ? "border-accent text-fg" : "border-line text-muted hover:text-fg"}`}>Display</button>
             {disp && (
               <div className="absolute right-0 top-9 z-30 w-52 space-y-1 rounded-xl border border-line bg-panel p-3 text-xs shadow-xl">
@@ -503,6 +482,27 @@ export default function TerminalPage() {
               </div>
             )}
           </div>
+  );
+  return (
+    <div className="relative left-1/2 -mb-20 flex h-[calc(100dvh-8.5rem)] w-screen -translate-x-1/2 flex-col border-t border-line lg:h-[calc(100dvh-5.5rem)]">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-3 py-2">
+        {!tracker && (
+          <button onClick={() => setTracker(true)} className="hidden h-8 rounded-md border border-line px-2 text-xs text-muted hover:text-fg xl:block">Wallet tracker</button>
+        )}
+        <h1 className="text-base font-bold italic">Pulse</h1>
+        <span className="flex items-center gap-1.5 text-xs text-up"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />live</span>
+        <div className="flex rounded-lg border border-line p-0.5 text-xs">
+          {([["base", `All ${NETS[net].label}`], ...(net === "base" ? [["keel", "Keelfun"]] : [])] as ["base" | "keel", string][]).map(([k, l]) => (
+            <button key={k} onClick={() => setSrc(k)} className={`rounded-md px-2.5 py-1 ${src === k ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}>{l}</button>
+          ))}
+        </div>
+        <div className="flex rounded-lg border border-line p-0.5 text-xs">
+          {([["all", "All"], ["watch", `★ ${watch.length}`]] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setView(k)} className={`rounded-md px-2.5 py-1 ${view === k ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}>{l}</button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          <div className="hidden lg:block">{display}</div>
           <PresetBar />
         </div>
       </div>
@@ -512,6 +512,7 @@ export default function TerminalPage() {
             {c.title}
           </button>
         ))}
+        <div className="flex items-center px-2">{display}</div>
       </div>
       <div className="flex min-h-0 flex-1">
         {tracker && <Tracker onClose={() => setTracker(false)} />}

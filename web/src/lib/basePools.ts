@@ -252,7 +252,15 @@ export async function fetchTokenTopPool(token: string, net: Net = "base"): Promi
   return a ? normAddr(String(a)) : null;
 }
 
+export const dexLabel = (id: string) => {
+  if (DEX_LABEL[id]) return DEX_LABEL[id];
+  const u = id.match(/^uniswap[-_]v(\d)/);
+  if (u) return `Uni v${u[1]}`;
+  return id.replace(/-(base|ethereum|eth|solana)$/, "").replace(/[-_]/g, " ").slice(0, 8);
+};
+
 export const DEX_LABEL: Record<string, string> = {
+  "aerodrome-slipstream": "Aero CL",
   "uniswap-v4-base": "Uni v4", "uniswap-v3-base": "Uni v3", "uniswap-v2-base": "Uni v2", "aerodrome-base": "Aero",
   "aero-slipstream-base": "Aero CL", "uniswap_v2": "Uni v2", "uniswap_v3": "Uni v3", "uniswap-v4-ethereum": "Uni v4", "uniswap-v4-eth": "Uni v4",
   "raydium": "Raydium", "raydium-clmm": "Raydium CL", "raydium-launchlab": "LaunchLab", "pump-fun": "Pump", "pumpswap": "PumpSwap", "meteora": "Meteora", "meteora-dlmm": "Meteora", "meteora-damm-v2": "Meteora", "orca": "Orca", "pancakeswap-v3-base": "Pancake", "sushiswap-v3-base": "Sushi", "baseswap": "BaseSwap",
