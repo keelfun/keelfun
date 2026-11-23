@@ -246,3 +246,20 @@ export async function tokenPrices(addrs: string[]): Promise<Record<string, numbe
   }
   return out;
 }
+
+export async function fetchPoolsByToken(addrs: string[]): Promise<BasePool[]> {
+  if (!addrs.length) return [];
+  const chunks: string[][] = [];
+  for (let i = 0; i < addrs.length; i += 30) chunks.push(addrs.slice(i, i + 30));
+  const pairs = (await Promise.all(chunks.map((c) => ds<DsPair[]>(`/tokens/v1/base/${c.join(",")}`).catch(() => [] as DsPair[])))).flat();
+  pairs.sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0));
+  const out = normalize(dsToGt(pairs));
+  return addrs.map((a) => out.find((p) => p.token.address === a)).filter(Boolean) as BasePool[];
+}
+
+export async function fetchPoolsByAddr(pools: string[]): Promise<BasePool[]> {
+  if (!pools.length) return [];
+  const r = await ds<{ pairs?: DsPair[] }>(`/latest/dex/pairs/base/${pools.slice(0, 30).join(",")}`);
+  const out = normalize(dsToGt(r.pairs ?? []));
+  return pools.map((p) => out.find((x) => x.pool === p)).filter(Boolean) as BasePool[];
+}

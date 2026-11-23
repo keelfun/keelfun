@@ -7,7 +7,7 @@ import { BASE_DOCS, BuiltOnBase } from "./BuiltOnBase";
 const T = "https://terminal.keelfun.app";
 const COLS: [string, [string, string][]][] = [
   ["Launchpad", [["Discover", "/"], ["Launch a token", "/launch/"], ["Swap", "/swap/"], ["Bridge", "/bridge/"], ["Portfolio", "/portfolio/"]]],
-  ["Terminal", [["Pulse", `${T}/`], ["Base trending", `${T}/discover/`], ["Hyperliquid", `${T}/perps/`], ["Wallets", `${T}/wallets/`], ["Traders", `${T}/traders/`], ["Chain", `${T}/chain/`]]],
+  ["Terminal", [["Market", `${T}/`], ["Pulse", `${T}/pulse/`], ["Tracker", `${T}/tracker/`], ["Perps", `${T}/perps/`], ["Wallets", `${T}/wallets/`], ["Traders", `${T}/traders/`], ["Chain", `${T}/chain/`]]],
   ["Protocol", [["Buyback", "/buyback/"], ["Flywheel", "/flywheel/"], ["Revenue", "/revenue/"], ["Platform fees", "/admin/"]]],
   ["Learn", [[`How ${BRAND} works`, "/docs/"], ["Fees, explained", "/docs/"], ["Holder rewards", "/docs/"], ["Developer API", "/api/"]]],
   ["Build", [[`Build on ${BRAND}`, "/builders/"], ["Builder programme", "/builders/#join"], ["Build on Base ↗", BASE_DOCS], ["Base ecosystem ↗", "https://www.base.org/ecosystem"]]],

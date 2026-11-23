@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { baseMeta, Bolt, PresetBar, RowSell, usePrefs, useRelayBuy } from "@/components/QuickBuy";
 import { LaunchpadChip, PoolAvatar, useLaunchpad } from "@/components/PoolAvatar";
-import { DEX_LABEL, fetchBasePools, type BasePool } from "@/lib/basePools";
+import { DEX_LABEL, fetchBasePools, fetchPoolsByAddr, fetchPoolsByToken, type BasePool } from "@/lib/basePools";
+import { useSet } from "@/lib/sets";
 import { fmtCompact, fmtPrice, fmtUsd, timeAgo } from "@/lib/format";
 import { errMsg } from "@/lib/tx";
 
@@ -64,9 +65,12 @@ export default function TrendingPage() {
   const [dur, setDur] = useState<(typeof DUR)[number]>("1h");
   const [q, setQ] = useState("");
   const [cjk, setCjk] = useState(false);
+  const [tab, setTab] = useState<"trending" | "watch" | "recent">("trending");
+  const watch = useSet("keel-watch");
+  const recent = useSet("keel-recent");
   const { data: all, isLoading, error } = useQuery({
-    queryKey: ["base-trending", dur, q.trim()],
-    queryFn: () => fetchBasePools("trending", q.trim(), dur),
+    queryKey: ["base-market", tab, dur, q.trim(), tab === "watch" ? watch.join() : tab === "recent" ? recent.join() : ""],
+    queryFn: () => (tab === "watch" ? fetchPoolsByToken(watch) : tab === "recent" ? fetchPoolsByAddr(recent) : fetchBasePools("trending", q.trim(), dur)),
     refetchInterval: 30000,
     retry: 3,
     retryDelay: (n) => 2000 * (n + 1),
@@ -76,11 +80,13 @@ export default function TrendingPage() {
   return (
     <div className="space-y-4 py-6">
       <div className="flex gap-5 border-b border-line text-sm">
-        <span className="-mb-px border-b-2 border-fg pb-2.5">Tokens</span>
-        <Link href="/traders/" className="pb-2.5 text-muted hover:text-fg">Traders</Link>
+        {([["trending", "Trending"], ["watch", `★ Watchlist${watch.length ? ` ${watch.length}` : ""}`], ["recent", "Recents"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setTab(k)} className={`-mb-px border-b-2 pb-2.5 ${tab === k ? "border-fg text-fg" : "border-transparent text-muted hover:text-fg"}`}>{l}</button>
+        ))}
+        <Link href="/traders/" className="ml-auto pb-2.5 text-muted hover:text-fg">Traders</Link>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-bold italic">Discover</h1>
+        <h1 className="text-xl font-bold italic">Market</h1>
         <span className="text-sm text-muted">Trending on Base</span>
         <div className="flex rounded-lg border border-line p-0.5">
           {DUR.map((d) => (
@@ -141,7 +147,7 @@ export default function TrendingPage() {
           </tbody>
         </table>
         {isLoading && <p className="p-8 text-center text-sm text-dim">Loading Base tokens…</p>}
-        {data && !data.length && !isLoading && <p className="p-8 text-center text-sm text-dim">No tokens match.</p>}
+        {data && !data.length && !isLoading && <p className="p-8 text-center text-sm text-dim">{tab === "watch" ? "Your watchlist is empty. Star tokens in Pulse to add them." : tab === "recent" ? "Tokens you open will show up here." : "No tokens match."}</p>}
         {error && !data && <p className="p-8 text-center text-sm text-dim">{(error as Error).message}</p>}
       </div>
       <p className="text-xs text-dim">Data from GeckoTerminal. Anyone can create a token on Base, including copies of real names. Check the contract before buying.</p>

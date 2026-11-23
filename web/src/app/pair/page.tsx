@@ -1,4 +1,5 @@
 "use client";
+import { pushRecent } from "@/lib/sets";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -107,6 +108,9 @@ function PairView() {
   const params = useSearchParams();
   const router = useRouter();
   const poolParam = params.get("p")?.toLowerCase() ?? "";
+  useEffect(() => {
+    if (poolParam) pushRecent(poolParam);
+  }, [poolParam]);
   const tokenParam = params.get("t")?.toLowerCase() ?? "";
   const resolved = useQuery({ queryKey: ["toppool", tokenParam], queryFn: () => fetchTokenTopPool(tokenParam), enabled: !poolParam && !!tokenParam });
   const pool = poolParam || resolved.data || "";

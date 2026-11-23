@@ -19,7 +19,7 @@ export function SearchK({ wide = false }: { wide?: boolean }) {
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") || (wide && e.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement | null)?.tagName ?? ""))) {
         e.preventDefault();
         setOpen((v) => !v);
       } else if (e.key === "Escape") setOpen(false);
@@ -55,10 +55,10 @@ export function SearchK({ wide = false }: { wide?: boolean }) {
   };
   return (
     <>
-      <button onClick={() => setOpen(true)} className={`flex h-9 items-center gap-2 rounded-lg border border-line px-2.5 text-xs text-muted hover:text-fg ${wide ? "md:w-44 xl:w-56" : ""}`} aria-label="Search">
+      <button onClick={() => setOpen(true)} className={`flex h-9 items-center gap-2 rounded-lg border border-line px-2.5 text-xs text-muted hover:text-fg ${wide ? "md:w-48 xl:w-72" : ""}`} aria-label="Search">
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-        <span className={`hidden ${wide ? "md:inline" : "2xl:inline"}`}>Search</span>
-        <kbd className={`ml-auto hidden rounded border border-line px-1 font-mono text-[10px] ${wide ? "md:inline" : "2xl:inline"}`}>Ctrl K</kbd>
+        <span className={`hidden truncate ${wide ? "md:inline" : "2xl:inline"}`}>{wide ? "Search by token or CA…" : "Search"}</span>
+        <kbd className={`ml-auto hidden rounded border border-line px-1 font-mono text-[10px] ${wide ? "md:inline" : "2xl:inline"}`}>{wide ? "/" : "Ctrl K"}</kbd>
       </button>
       {open &&
         createPortal(

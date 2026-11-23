@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { baseMeta, Bolt, keelMeta, PresetBar, RowSell, useKeelBuy, usePrefs, useRelayBuy } from "@/components/QuickBuy";
 import { TokenAvatar } from "@/components/TokenAvatar";
+import { Tracker } from "@/components/Tracker";
 import { LaunchpadChip, PoolAvatar, useLaunchpad } from "@/components/PoolAvatar";
 import { api, useTokens, type Portfolio, type Token } from "@/lib/api";
 import { fetchBasePools, type BasePool } from "@/lib/basePools";
@@ -427,80 +428,9 @@ function BaseColumn({ sort, title, buy, hidden, view }: ColProps<BasePool>) {
   );
 }
 
-function Tracker({ onClose }: { onClose: () => void }) {
-  const [wallets, setWallets] = useState<string[]>([]);
-  const [input, setInput] = useState("");
-  useEffect(() => {
-    try {
-      setWallets(JSON.parse(localStorage.getItem("keel-tracked") || "[]"));
-    } catch {}
-  }, []);
-  const save = (w: string[]) => (setWallets(w), localStorage.setItem("keel-tracked", JSON.stringify(w)));
-  const add = () => {
-    const w = input.trim().toLowerCase();
-    if (/^0x[0-9a-f]{40}$/.test(w) && !wallets.includes(w)) save([...wallets, w]);
-    setInput("");
-  };
-  const qs = useQueries({
-    queries: wallets.map((w) => ({ queryKey: ["portfolio", w], queryFn: () => api<Portfolio>(`/portfolio/${w}`), refetchInterval: 8000 })),
-  });
-  const feed = qs
-    .flatMap((q, i) => (q.data?.trades ?? []).map((r) => ({ ...r, wallet: wallets[i] })))
-    .sort((a, b) => b.ts - a.ts)
-    .slice(0, 60);
-  return (
-    <aside className="hidden w-72 shrink-0 flex-col border-r border-line xl:flex">
-      <div className="flex items-center justify-between border-b border-line px-3 py-2.5">
-        <h2 className="text-sm font-semibold">Wallet tracker</h2>
-        <button onClick={onClose} className="text-muted hover:text-fg" aria-label="Close">×</button>
-      </div>
-      <div className="flex gap-1.5 border-b border-line p-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder="0x… wallet"
-          className="h-8 min-w-0 flex-1 rounded-md border border-line bg-bg px-2 font-mono text-xs outline-none focus:border-accent"
-        />
-        <button onClick={add} className="h-8 rounded-md bg-accent px-3 text-xs font-semibold text-accent-ink">Add</button>
-      </div>
-      {wallets.length > 0 && (
-        <div className="flex flex-wrap gap-1 border-b border-line p-2">
-          {wallets.map((w) => (
-            <span key={w} className="inline-flex items-center gap-1 rounded bg-panel-2 px-1.5 py-0.5 font-mono text-[10px] text-muted">
-              <Link href={`/portfolio/?w=${w}`} className="hover:text-fg">{shortAddr(w)}</Link>
-              <button onClick={() => save(wallets.filter((x) => x !== w))} className="hover:text-down">×</button>
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
-        {wallets.length === 0 ? (
-          <p className="px-4 py-10 text-center text-xs leading-relaxed text-muted">Track a wallet to see what it buys and sells on Keelfun.</p>
-        ) : feed.length === 0 ? (
-          <p className="px-4 py-10 text-center text-xs text-dim">No trades from tracked wallets yet.</p>
-        ) : (
-          feed.map((r) => (
-            <Link key={r.id + r.wallet} href={`/token/?a=${r.token}`} className="flex items-center gap-2 border-b border-line/60 px-3 py-2 text-xs hover:bg-panel-2/60">
-              <TokenAvatar src={r.image} symbol={r.symbol} size={24} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate">
-                  <span className={r.isBuy ? "text-up" : "text-down"}>{r.isBuy ? "Buy" : "Sell"}</span> ${r.symbol}
-                </p>
-                <p className="font-mono text-[10px] text-dim">{shortAddr(r.wallet)} · {timeAgo(r.ts)} ago</p>
-              </div>
-              <span className="font-mono text-[11px] text-muted">{fmtCompact(r.pairAmount ?? r.eth, 4)} {r.pair ? pairInfo(r.pair).symbol : "ETH"}</span>
-            </Link>
-          ))
-        )}
-      </div>
-    </aside>
-  );
-}
-
 export default function TerminalPage() {
   const [tab, setTab] = useState(0);
-  const [tracker, setTracker] = useState(true);
+  const [tracker, setTracker] = useState(false);
   const [src, setSrc] = useState<"base" | "keel">("base");
   const [view, setView] = useState<"all" | "watch">("all");
   const [watch] = useWatch();
@@ -517,7 +447,7 @@ export default function TerminalPage() {
   }, []);
   const cols = src === "base" ? BASE_COLS : COLS;
   return (
-    <div className="relative left-1/2 -mb-20 flex h-[calc(100dvh-6.5rem)] w-screen -translate-x-1/2 flex-col border-t border-line lg:h-[calc(100dvh-3.5rem)]">
+    <div className="relative left-1/2 -mb-20 flex h-[calc(100dvh-8.5rem)] w-screen -translate-x-1/2 flex-col border-t border-line lg:h-[calc(100dvh-5.5rem)]">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-3 py-2">
         {!tracker && (
           <button onClick={() => setTracker(true)} className="hidden h-8 rounded-md border border-line px-2 text-xs text-muted hover:text-fg xl:block">Wallet tracker</button>

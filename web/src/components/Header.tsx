@@ -6,21 +6,23 @@ import { BRAND, chain } from "@/lib/config";
 import { ConnectButton } from "./ConnectButton";
 import { LangButton, ThemeButton } from "./Prefs";
 import { SearchK } from "./SearchK";
-import { useVault } from "@/lib/vault";
+import { TickerStrip, WalletChip } from "./TerminalChrome";
 
 export const TERMINAL_URL = "https://terminal.keelfun.app";
 const TERM = [
-  { href: "/discover/", label: "Discover", desc: "Trending tokens on Base" },
-  { href: "/", label: "Pulse", desc: "New, trending and top Base pairs, live" },
-  { href: "/traders/", label: "Traders", desc: "PnL leaderboard" },
-  { href: "/chain/", label: "Chain", desc: "Base volume by DEX" },
-  { href: "/perps/", label: "Hyperliquid", desc: "Perps on Hyperliquid" },
-  { href: "/portfolio/", label: "Portfolio", desc: "Your wallets, or any address" },
+  { href: "/", label: "Market", desc: "Trending, watchlist and recent Base tokens" },
+  { href: "/pulse/", label: "Pulse", desc: "New, trending and top Base pairs, live" },
+  { href: "/tracker/", label: "Tracker", desc: "Follow any wallet's trades" },
   { href: "/wallets/", label: "Wallets", desc: "Trading wallets for one-click buys" },
+  { href: "/portfolio/", label: "Portfolio", desc: "Your wallets, or any address" },
+  { href: "/perps/", label: "Perps", desc: "Perps on Hyperliquid" },
 ];
 const TERM_MORE = [
+  { href: "/traders/", label: "Traders" },
+  { href: "/chain/", label: "Chain" },
   { href: "/upcoming/", label: "Upcoming launches" },
   { href: "/buyback/", label: "Buyback & burn" },
+  { href: "https://keelfun.app/launch/", label: "Launch a token ↗" },
   { href: "https://keelfun.app/", label: "Keelfun ↗" },
 ];
 const PRIMARY = [
@@ -111,7 +113,11 @@ export function Header() {
   const path = usePathname();
   const term = useIsTerminal();
   const active = (href: string) =>
-    href === "/" ? path === "/" || (term && path.startsWith("/terminal")) : path.startsWith(href.replace(/\/$/, ""));
+    href === "/"
+      ? path === "/" || (term && path.startsWith("/discover"))
+      : term && href === "/pulse/"
+        ? path.startsWith("/pulse") || path.startsWith("/terminal")
+        : path.startsWith(href.replace(/\/$/, ""));
   if (term) return <TerminalHeader active={active} />;
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/85 backdrop-blur">
@@ -189,22 +195,10 @@ function GearMenu() {
   );
 }
 
-function VaultButton() {
-  const v = useVault();
-  const n = v.data?.wallets.length ?? 0;
-  const label = !v.exists ? "Set up wallets" : v.data ? `${n} wallet${n === 1 ? "" : "s"}` : "Unlock vault";
-  return (
-    <Link href="/wallets/" className={`flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-medium ${v.data ? "border border-line text-fg hover:bg-panel-2" : "bg-fg text-bg hover:opacity-90"}`}>
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="6" width="18" height="14" rx="2" /><path d="M3 10h18M16 15h2" /></svg>
-      <span className="hidden sm:inline">{label}</span>
-    </Link>
-  );
-}
-
 function TerminalHeader({ active }: { active: (h: string) => boolean }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur">
-      <div className="flex h-14 items-center gap-4 px-4">
+      <div className="flex h-14 items-center gap-3 px-4 xl:gap-4">
         <Link href="/" className="flex shrink-0 items-center gap-2">
           <Logo className="h-7 w-7" />
           <span className="text-[15px] font-semibold tracking-tight">{BRAND}</span>
@@ -219,11 +213,12 @@ function TerminalHeader({ active }: { active: (h: string) => boolean }) {
         </nav>
         <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
           <SearchK wide />
-          <a href="https://keelfun.app/launch/" aria-label="Launch a token" title="Launch a token" className="hidden h-9 w-9 items-center justify-center rounded-full border border-accent/40 text-accent-fg hover:bg-accent/10 sm:flex">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2.1-.1-2.9a2.2 2.2 0 0 0-2.9-.1z" /><path d="m12 15-3-3a22 22 0 0 1 2-3.9A12.9 12.9 0 0 1 22 2c0 2.7-.8 7.5-6 11a22.4 22.4 0 0 1-4 2z" /><path d="M9 12H4s.6-3 2-4c1.6-1.1 5 0 5 0M12 15v5s3-.6 4-2c1.1-1.6 0-5 0-5" /></svg>
-          </a>
+          <span className="hidden h-9 items-center gap-1.5 rounded-lg border border-line px-2.5 text-xs font-medium xl:flex" title="Base mainnet">
+            <span className="h-3.5 w-3.5 rounded-[3px] bg-accent" />Base
+          </span>
+          <Link href="/wallets/" className="hidden h-9 items-center rounded-lg bg-accent px-3.5 text-sm font-semibold text-accent-ink hover:opacity-90 md:flex">Deposit</Link>
+          <WalletChip />
           <GearMenu />
-          <VaultButton />
           <ConnectButton />
         </div>
       </div>
@@ -234,6 +229,7 @@ function TerminalHeader({ active }: { active: (h: string) => boolean }) {
           </Link>
         ))}
       </nav>
+      <TickerStrip />
     </header>
   );
 }
