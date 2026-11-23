@@ -117,6 +117,7 @@ async function update(fn: (d: VaultData) => VaultData) {
 
 export const vaultActions = {
   add: () => update((d) => ({ ...d, wallets: [...d.wallets, newWallet(`Wallet ${d.wallets.length + 1}`)] })),
+  addMany: (n: number) => update((d) => ({ ...d, wallets: [...d.wallets, ...Array.from({ length: Math.max(1, Math.min(20, n)) }, (_, k) => newWallet(`Wallet ${d.wallets.length + k + 1}`))] })),
   importKey: (pk: string, name?: string) => {
     const k = (pk.trim().startsWith("0x") ? pk.trim() : `0x${pk.trim()}`) as Hex;
     if (!/^0x[0-9a-fA-F]{64}$/.test(k)) throw new Error("Not a valid private key");

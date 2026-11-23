@@ -25,3 +25,9 @@ export function pushRecent(pool: string) {
   localStorage.setItem("keel-recent", JSON.stringify([x, ...readSet("keel-recent").filter((y) => y !== x)].slice(0, 30)));
   dispatchEvent(new Event(SETS_EVT));
 }
+export function toggleSet(key: string, a: string) {
+  const x = a.toLowerCase();
+  const cur = readSet(key);
+  localStorage.setItem(key, JSON.stringify(cur.includes(x) ? cur.filter((y) => y !== x) : [...cur, x]));
+  dispatchEvent(new Event(SETS_EVT));
+}

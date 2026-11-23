@@ -19,8 +19,9 @@ export function useVaultBalance() {
     contracts: ws.map((w) => ({ address: MULTICALL, abi: ethBalAbi, functionName: "getEthBalance", args: [w.address], chainId: chain.id }) as const),
     query: { enabled: ws.length > 0, refetchInterval: 15000 },
   });
-  const total = (r.data ?? []).reduce((s, x) => s + (x.status === "success" ? Number(x.result) / 1e18 : 0), 0);
-  return { v, n: ws.length, total };
+  const bals = ws.map((_, i) => (r.data?.[i]?.status === "success" ? Number(r.data[i].result) / 1e18 : null));
+  const total = bals.reduce<number>((s, x) => s + (x ?? 0), 0);
+  return { v, n: ws.length, total, bals, refetch: r.refetch };
 }
 
 const WalletIcon = ({ className = "h-4 w-4" }: { className?: string }) => (

@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { formatEther, parseEther } from "viem";
+import { erc20Abi, formatEther, isAddress, parseEther, parseUnits } from "viem";
 import { useAccount, useBalance, useSendTransaction, useSignMessage } from "wagmi";
 import { chain, EXPLORER } from "@/lib/config";
 import { shortAddr } from "@/lib/format";
@@ -11,6 +11,7 @@ import {
 import { api } from "@/lib/api";
 import { useVaultHoldings, vaultSell, type Holding } from "@/lib/vaultHoldings";
 import { TokenAvatar } from "@/components/TokenAvatar";
+import { useVaultBalance } from "@/components/TerminalChrome";
 
 const usd = (n: number) => (n >= 1 ? `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : n > 0 ? `$${n.toPrecision(3)}` : "—");
 const amt = (n: number) => (n >= 1000 ? n.toLocaleString(undefined, { maximumFractionDigits: 0 }) : n.toLocaleString(undefined, { maximumSignificantDigits: 5 }));
@@ -158,6 +159,111 @@ function Row({ w, i, groups, tracked, acts, onErr }: { w: VaultWallet; i: number
 }
 const confirm2 = (m: string) => window.confirm(m);
 
+function Overview({ d }: { d: { wallets: VaultWallet[]; groups: number[][]; tokens?: Record<string, TokenMeta[]> } }) {
+  const { bals, total } = useVaultBalance();
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-line bg-panel">
+      <table className="w-full min-w-[520px] text-sm">
+        <thead className="text-xs text-dim">
+          <tr className="border-b border-line">
+            <th className="px-4 py-2.5 text-left font-normal">Wallet</th>
+            <th className="px-4 py-2.5 text-left font-normal">Address</th>
+            <th className="px-4 py-2.5 text-right font-normal">ETH</th>
+            <th className="px-4 py-2.5 text-right font-normal">Tokens</th>
+            <th className="px-4 py-2.5 text-right font-normal">Presets</th>
+          </tr>
+        </thead>
+        <tbody className="font-mono text-xs">
+          {d.wallets.map((w, i) => (
+            <tr key={w.address} className="border-b border-line/60">
+              <td className="px-4 py-2.5 font-sans text-sm">{w.name}</td>
+              <td className="px-4 py-2.5"><a href={`${EXPLORER}/address/${w.address}`} target="_blank" rel="noreferrer" className="text-muted hover:text-accent-fg">{shortAddr(w.address)}</a></td>
+              <td className="px-4 py-2.5 text-right">{bals[i] == null ? "…" : bals[i]!.toFixed(4)}</td>
+              <td className="px-4 py-2.5 text-right text-muted">{d.tokens?.[w.address.toLowerCase()]?.length ?? 0}</td>
+              <td className="px-4 py-2.5 text-right text-muted">{d.groups.map((g, k) => (g.includes(i) ? `P${k + 1}` : null)).filter(Boolean).join(" ") || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="text-xs">
+            <td className="px-4 py-2.5 text-dim" colSpan={2}>{d.wallets.length} wallets</td>
+            <td className="px-4 py-2.5 text-right font-mono">Ξ {total.toFixed(4)}</td>
+            <td colSpan={2} />
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+function Transfer({ d }: { d: { wallets: VaultWallet[]; tokens?: Record<string, TokenMeta[]> } }) {
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const onErr = (t: string) => setMsg({ ok: false, t });
+  const onDone = (t: string) => setMsg({ ok: true, t });
+  const [from, setFrom] = useState(0);
+  const [to, setTo] = useState("1");
+  const [custom, setCustom] = useState("");
+  const [asset, setAsset] = useState("eth");
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const w = d.wallets[from];
+  const toks = d.tokens?.[w?.address.toLowerCase() ?? ""] ?? [];
+  const dest = to === "custom" ? custom.trim() : d.wallets[Number(to)]?.address ?? "";
+  const tok = toks.find((t) => t.address.toLowerCase() === asset);
+  const send = async () => {
+    if (!w || !isAddress(dest)) return onErr("Pick a valid destination");
+    if (dest.toLowerCase() === w.address.toLowerCase()) return onErr("Source and destination are the same wallet");
+    if (!(Number(amount) > 0)) return onErr("Enter an amount");
+    if (!confirm2(`Send ${amount} ${tok ? tok.symbol : "ETH"} from ${w.name} to ${shortAddr(dest)}?`)) return;
+    setBusy(true);
+    try {
+      const c = vaultClient(w);
+      const h = tok
+        ? await c.writeContract({ address: tok.address, abi: erc20Abi, functionName: "transfer", args: [dest as `0x${string}`, parseUnits(amount, tok.decimals)] })
+        : await c.sendTransaction({ to: dest as `0x${string}`, value: parseEther(amount) });
+      const r = await vaultPublic().waitForTransactionReceipt({ hash: h });
+      if (r.status !== "success") throw new Error("Transfer reverted");
+      setAmount("");
+      onDone(`Sent ${amount} ${tok ? tok.symbol : "ETH"} to ${shortAddr(dest)}.`);
+    } catch (e) {
+      onErr(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const sel = "h-9 min-w-0 rounded-lg border border-line bg-bg px-2 text-xs outline-none focus:border-accent";
+  return (
+    <div className="space-y-3 rounded-2xl border border-line bg-panel p-4">
+      <h2 className="text-sm font-semibold">Transfer</h2>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="grid gap-1 text-xs text-dim">From
+          <select value={from} onChange={(e) => (setFrom(Number(e.target.value)), setAsset("eth"))} className={sel}>
+            {d.wallets.map((x, i) => <option key={x.address} value={i}>{x.name} · {shortAddr(x.address)}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs text-dim">To
+          <select value={to} onChange={(e) => setTo(e.target.value)} className={sel}>
+            {d.wallets.map((x, i) => (i === from ? null : <option key={x.address} value={i}>{x.name} · {shortAddr(x.address)}</option>))}
+            <option value="custom">Other address…</option>
+          </select>
+        </label>
+        {to === "custom" && <input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="0x… destination" className={`${sel} font-mono sm:col-span-2`} />}
+        <label className="grid gap-1 text-xs text-dim">Asset
+          <select value={asset} onChange={(e) => setAsset(e.target.value)} className={sel}>
+            <option value="eth">ETH</option>
+            {toks.map((t) => <option key={t.address} value={t.address.toLowerCase()}>{t.symbol}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs text-dim">Amount
+          <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.0" className={`${sel} font-mono`} />
+        </label>
+      </div>
+      <button onClick={send} disabled={busy || d.wallets.length < 1} className="h-9 w-full rounded-lg bg-accent text-sm font-semibold text-accent-ink disabled:opacity-50">{busy ? "Sending…" : "Send"}</button>
+      {msg && <p className={`text-xs ${msg.ok ? "text-up" : "text-down"}`}>{msg.t}</p>}
+    </div>
+  );
+}
+
 export default function WalletsPage() {
   const v = useVault();
   const ensure = useEnsureWallet();
@@ -169,6 +275,7 @@ export default function WalletsPage() {
   const [busy, setBusy] = useState(false);
   const [imp, setImp] = useState("");
   const [note, setNote] = useState("");
+  const [batch, setBatch] = useState("5");
   const file = useRef<HTMLInputElement>(null);
   const act = async (f: () => Promise<unknown>) => {
     setErr("");
@@ -212,7 +319,7 @@ export default function WalletsPage() {
   const d = v.data;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 py-8">
+    <div className="mx-auto max-w-3xl space-y-6 py-8">
       <h1 className="text-xl font-bold italic">Wallets</h1>
       {!d ? (
         <div className="space-y-4">
@@ -251,6 +358,10 @@ export default function WalletsPage() {
             <span className="flex items-center gap-1.5 text-sm text-up"><span className="h-1.5 w-1.5 rounded-full bg-up" />Unlocked · {d.wallets.length} wallet{d.wallets.length === 1 ? "" : "s"}</span>
             <div className="ml-auto flex flex-wrap gap-2">
               <button onClick={() => act(vaultActions.add)} className="h-8 rounded-lg bg-accent px-3 text-xs font-semibold text-accent-ink">+ New wallet</button>
+              <span className="flex h-8 items-center rounded-lg border border-line text-xs">
+                <input value={batch} onChange={(e) => setBatch(e.target.value.replace(/\D/g, "").slice(0, 2))} className="w-8 bg-transparent text-center font-mono outline-none" aria-label="Wallets to create" />
+                <button onClick={() => act(() => vaultActions.addMany(Number(batch) || 1))} className="h-full border-l border-line px-2.5 text-muted hover:text-fg">Batch create</button>
+              </span>
               <button onClick={() => act(async () => exportBackup())} className="h-8 rounded-lg border border-line px-3 text-xs text-muted hover:text-fg">Download backup</button>
               <button onClick={() => cloud("save")} disabled={busy} className="h-8 rounded-lg border border-line px-3 text-xs text-muted hover:text-fg">Save to cloud</button>
               <button onClick={lock} className="h-8 rounded-lg border border-line px-3 text-xs text-muted hover:text-fg">Lock</button>
@@ -265,6 +376,8 @@ export default function WalletsPage() {
             </div>
             <span className="text-xs text-dim">Wallets tagged P1/P2/P3 buy when that preset is active. Untagged presets use your connected wallet.</span>
           </div>
+          <Overview d={d} />
+          <Transfer d={d} />
           {d.wallets.map((w, i) => (
             <Row key={w.address} w={w} i={i} groups={d.groups} tracked={d.tokens?.[w.address.toLowerCase()] ?? []} acts={(d.activity ?? []).filter((x) => x.wallet === w.address.toLowerCase())} onErr={setErr} />
           ))}

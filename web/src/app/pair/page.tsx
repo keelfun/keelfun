@@ -1,18 +1,17 @@
 "use client";
-import { pushRecent } from "@/lib/sets";
+import { pushRecent, toggleSet, useSet } from "@/lib/sets";
+import { PairTabs, SecurityCard, TradePanel, useSecurity } from "@/components/PairTrade";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CandlestickSeries, ColorType, createChart, HistogramSeries, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import { AnySwap } from "@/components/AnySwap";
-import { baseMeta, Bolt, PresetBar, QuickSell, usePrefs, useRelayBuy } from "@/components/QuickBuy";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { api, type Token } from "@/lib/api";
 import { DEX_LABEL, fetchOhlcv, fetchPool, fetchPoolTrades, fetchTokenTopPool, type PoolDetail } from "@/lib/basePools";
 import { EXPLORER } from "@/lib/config";
 import { fmtCompact, fmtPrice, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
-import { errMsg } from "@/lib/tx";
 
 const TF = [
   { l: "1m", tf: "minute", a: 1 },
@@ -80,30 +79,6 @@ function Chart({ pool, supply }: { pool: string; supply: number }) {
   );
 }
 
-function QuickBtn({ p }: { p: PoolDetail }) {
-  const { preset } = usePrefs();
-  const relay = useRelayBuy();
-  const [s, setS] = useState("");
-  const go = async () => {
-    setS("busy");
-    try {
-      await relay(p, preset);
-      setS("ok");
-    } catch (e) {
-      setS(errMsg(e));
-    }
-  };
-  return (
-    <div>
-      <button onClick={go} disabled={s === "busy"} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-up font-semibold text-bg disabled:opacity-60">
-        <Bolt className="h-4 w-4" />
-        {s === "busy" ? "Buying…" : s === "ok" ? "Bought" : `Quick buy ${preset.amount} ETH`}
-      </button>
-      {s && s !== "busy" && s !== "ok" && <p className="mt-1 text-xs text-down">{s}</p>}
-    </div>
-  );
-}
-
 function PairView() {
   const params = useSearchParams();
   const router = useRouter();
@@ -125,6 +100,8 @@ function PairView() {
   }, [keel.data, p, router]);
   const trades = useQuery({ queryKey: ["ptrades", pool], queryFn: () => fetchPoolTrades(pool, p!.token.address), enabled: !!p, refetchInterval: 20000 });
   const [copied, setCopied] = useState(false);
+  const sec = useSecurity(p?.token.address);
+  const watched = useSet("keel-watch").includes(p?.token.address.toLowerCase() ?? "-");
 
   if (!pool) return <p className="py-20 text-center text-sm text-muted">{resolved.isLoading ? "Finding the main pool…" : "No pair selected."}</p>;
   if (error) return <p className="py-20 text-center text-sm text-down">{(error as Error).message}</p>;
@@ -139,78 +116,57 @@ function PairView() {
     ["Age", p.createdAt ? timeAgo(p.createdAt) : "—", p.feePct ? `${p.feePct}% pool fee` : undefined],
   ];
   return (
-    <div className="space-y-5 py-6">
-      <Link href="/terminal/" className="text-sm text-muted hover:text-fg">← Terminal</Link>
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex min-w-0 flex-1 basis-full items-center gap-4 sm:basis-0">
-        <TokenAvatar src={p.token.image} symbol={p.token.symbol} size={60} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-x-3">
-            <h1 className="text-2xl font-bold sm:text-3xl">{p.token.symbol}</h1>
-            <span className="text-muted">/ {p.quote}</span>
-            <span className="text-sm text-dim">{p.token.name}</span>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-            <button onClick={() => navigator.clipboard.writeText(p.token.address).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1000)))} className="rounded-md border border-line px-2 py-1 font-mono text-muted hover:text-fg">
-              {copied ? "copied" : shortAddr(p.token.address)}
-            </button>
-            <span className="rounded-md border border-line px-2 py-1 text-muted">{DEX_LABEL[p.dex] ?? p.dex}</span>
-            <a href={`${EXPLORER}/token/${p.token.address}`} target="_blank" rel="noreferrer" className="rounded-md border border-line px-2 py-1 text-muted hover:text-fg">Basescan ↗</a>
-            <a href={`https://www.geckoterminal.com/base/pools/${p.pool}`} target="_blank" rel="noreferrer" className="rounded-md border border-line px-2 py-1 text-muted hover:text-fg">GeckoTerminal ↗</a>
-            <a href={`https://dexscreener.com/base/${p.pool}`} target="_blank" rel="noreferrer" className="rounded-md border border-line px-2 py-1 text-muted hover:text-fg">DexScreener ↗</a>
-          </div>
-        </div>
-        </div>
-        <PresetBar />
-      </div>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-6">
-        {stats.map(([k, v, sub]) => (
-          <div key={k}>
-            <p className="text-xs text-muted">{k}</p>
-            <p className="mt-1 text-xl font-bold">{v}</p>
-            {sub && <p className="font-mono text-[11px] text-dim">{sub}</p>}
-          </div>
-        ))}
-      </div>
-      <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
-        <div className="min-w-0 space-y-5">
-          <Chart pool={p.pool} supply={supply} />
-          <div>
-            <h3 className="mb-3 text-lg font-semibold">Transactions</h3>
-            <div className="max-h-[560px] overflow-auto rounded-2xl border border-line">
-              <table className="w-full min-w-[560px] text-xs tabular-nums">
-                <thead className="sticky top-0 bg-panel text-muted">
-                  <tr className="border-b border-line">
-                    <th className="px-3 py-2.5 text-left font-normal">Time</th>
-                    <th className="px-3 py-2.5 text-left font-normal">Type</th>
-                    <th className="px-3 py-2.5 text-right font-normal">Price</th>
-                    <th className="px-3 py-2.5 text-right font-normal">Amount</th>
-                    <th className="px-3 py-2.5 text-right font-normal">Value</th>
-                    <th className="px-3 py-2.5 text-right font-normal">Wallet</th>
-                  </tr>
-                </thead>
-                <tbody className="font-mono">
-                  {trades.data?.map((r) => (
-                    <tr key={r.tx + r.from + r.usd} className="border-b border-line/60">
-                      <td className="px-3 py-2.5 text-muted"><a href={`${EXPLORER}/tx/${r.tx}`} target="_blank" rel="noreferrer" className="hover:text-fg">{timeAgo(r.ts)} ago ↗</a></td>
-                      <td className={`px-3 py-2.5 font-sans text-sm ${r.kind === "buy" ? "text-up" : "text-down"}`}>{r.kind === "buy" ? "Buy" : "Sell"}</td>
-                      <td className="px-3 py-2.5 text-right">${fmtPrice(r.priceUsd)}</td>
-                      <td className="px-3 py-2.5 text-right">{fmtCompact(r.tokenAmount)} <span className="text-dim">{p.token.symbol}</span></td>
-                      <td className="px-3 py-2.5 text-right">{fmtUsd(r.usd)}</td>
-                      <td className="px-3 py-2.5 text-right"><Link href={`/portfolio/?w=${r.from}`} className="text-muted hover:text-accent-fg">{shortAddr(r.from)}</Link></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {trades.isLoading && <p className="p-6 text-center text-xs text-dim">Loading trades…</p>}
+    <div className="relative left-1/2 w-screen -translate-x-1/2 space-y-3 px-3 py-3 sm:px-4">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-line bg-panel px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <TokenAvatar src={p.token.image} symbol={p.token.symbol} size={44} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold">{p.token.symbol}</h1>
+              <span className="text-sm text-muted">/ {p.quote}</span>
+              <button onClick={() => toggleSet("keel-watch", p.token.address)} className={watched ? "text-warn" : "text-dim hover:text-fg"} title={watched ? "Remove from watchlist" : "Add to watchlist"} aria-label="Watchlist">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill={watched ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z" /></svg>
+              </button>
+            </div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-dim">
+              <span className="max-w-[10rem] truncate">{p.token.name}</span>
+              <button onClick={() => navigator.clipboard.writeText(p.token.address).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1000)))} className="font-mono hover:text-fg" title="Copy contract address">
+                {copied ? "copied" : shortAddr(p.token.address)} ⧉
+              </button>
+              <span className="rounded border border-line px-1.5">{DEX_LABEL[p.dex] ?? p.dex}</span>
+              <a href={`${EXPLORER}/token/${p.token.address}`} target="_blank" rel="noreferrer" className="hover:text-fg">Basescan ↗</a>
+              <a href={`https://dexscreener.com/base/${p.pool}`} target="_blank" rel="noreferrer" className="hover:text-fg">DexScreener ↗</a>
+              <a href={`https://x.com/search?q=${encodeURIComponent(`$${p.token.symbol} OR ${p.token.address}`)}&f=live`} target="_blank" rel="noreferrer" className="hover:text-fg">X ↗</a>
             </div>
           </div>
         </div>
-        <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          <QuickBtn p={p} />
-          <QuickSell meta={baseMeta(p.token)} />
-          <AnySwap initialGet={p.token.address} />
-          <p className="text-xs leading-relaxed text-dim">Swaps route through Relay at the best price on Base. Anyone can create a token on Base, including copies of real names, so check the contract first.</p>
+        <div className="grid flex-1 grid-cols-3 gap-x-5 gap-y-2 sm:flex sm:flex-wrap">
+          {stats.map(([k, v, sub]) => (
+            <div key={k} className="min-w-0">
+              <p className="text-[11px] text-dim">{k}</p>
+              <p className="truncate font-mono text-sm font-semibold">{v}</p>
+              {sub && <p className={`truncate font-mono text-[10px] ${k === "Price" ? (p.chg24 >= 0 ? "text-up" : "text-down") : "text-dim"}`}>{sub}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0">
+          <Chart pool={p.pool} supply={supply} />
+        </div>
+        <aside className="space-y-3 lg:sticky lg:top-28 lg:row-span-2 lg:self-start">
+          <TradePanel p={p} />
+          <SecurityCard p={p} sec={sec.data} loading={sec.isLoading} />
+          <details className="rounded-xl border border-line bg-panel p-3">
+            <summary className="cursor-pointer text-xs font-semibold">Swap with any token</summary>
+            <div className="mt-3">
+              <AnySwap initialGet={p.token.address} />
+            </div>
+          </details>
+          <p className="text-[11px] leading-relaxed text-dim">Swaps route through Relay at the best price on Base. Anyone can create a token on Base, including copies of real names, so check the contract first.</p>
+        </aside>
+        <div className="min-w-0">
+          <PairTabs p={p} trades={trades.data} loading={trades.isLoading} sec={sec.data} />
         </div>
       </div>
     </div>

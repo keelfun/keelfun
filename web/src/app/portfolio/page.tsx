@@ -166,6 +166,86 @@ function WalletBar({ current }: { current: string }) {
   );
 }
 
+function Analytics({ data, ethUsd }: { data: Portfolio; ethUsd: number }) {
+  const hold = new Map(data.holdings.map((h) => [h.token.address.toLowerCase(), h.valueEth]));
+  const per = new Map<string, { b: number; s: number }>();
+  for (const r of data.trades) {
+    const x = per.get(r.token.toLowerCase()) ?? { b: 0, s: 0 };
+    if (r.isBuy) x.b += r.eth;
+    else x.s += r.eth;
+    per.set(r.token.toLowerCase(), x);
+  }
+  const pnls = [...per].map(([t, x]) => x.s + (hold.get(t) ?? 0) - x.b);
+  const wins = pnls.filter((v) => v > 0).length;
+  const bought = [...per.values()].reduce((a, x) => a + x.b, 0);
+  const sold = [...per.values()].reduce((a, x) => a + x.s, 0);
+  const holdEth = data.holdings.reduce((a, h) => a + h.valueEth, 0);
+  const pnl = sold + holdEth - bought;
+  const asc = [...data.trades].sort((a, b) => a.ts - b.ts);
+  let acc = 0;
+  const pts = [0, ...asc.map((r) => (acc += r.isBuy ? -r.eth : r.eth)), acc + holdEth];
+  const lo = Math.min(...pts);
+  const hi = Math.max(...pts);
+  const path = pts.map((v, i) => `${i ? "L" : "M"}${((i / Math.max(1, pts.length - 1)) * 300).toFixed(1)},${(hi === lo ? 40 : 76 - ((v - lo) / (hi - lo)) * 72).toFixed(1)}`).join(" ");
+  const days = 91;
+  const today = Math.floor(Date.now() / 86_400_000);
+  const counts = new Array(days).fill(0);
+  for (const r of data.trades) {
+    const k = days - 1 - (today - Math.floor(r.ts / 86_400));
+    if (k >= 0 && k < days) counts[k]++;
+  }
+  const max = Math.max(1, ...counts);
+  const usdEth = (e: number) => (ethUsd ? fmtUsd(e * ethUsd) : `${amt(e)} ETH`);
+  const up = pnl >= 0;
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <div className="rounded-2xl border border-line bg-panel p-5 lg:col-span-2">
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
+          <div>
+            <p className="text-xs text-dim">Total value</p>
+            <p className="text-2xl font-bold">{usdEth(holdEth)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-dim">PnL</p>
+            <p className={`text-2xl font-bold ${up ? "text-up" : "text-down"}`}>{up ? "+" : "-"}{usdEth(Math.abs(pnl))}</p>
+          </div>
+          <p className="ml-auto text-xs text-dim">Realized + unrealized, Keelfun markets</p>
+        </div>
+        <svg viewBox="0 0 300 80" preserveAspectRatio="none" className="mt-4 h-28 w-full">
+          <path d={`${path} L300,80 L0,80 Z`} style={{ fill: up ? "var(--color-up)" : "var(--color-down)", opacity: 0.1 }} />
+          <path d={path} fill="none" vectorEffect="non-scaling-stroke" strokeWidth="2" style={{ stroke: up ? "var(--color-up)" : "var(--color-down)" }} />
+        </svg>
+      </div>
+      <div className="space-y-4 rounded-2xl border border-line bg-panel p-5">
+        <div className="grid grid-cols-3 gap-2 text-center">
+          {[
+            ["Win rate", pnls.length ? `${Math.round((wins / pnls.length) * 100)}%` : "—"],
+            ["Trades", String(data.trades.length)],
+            ["Tokens", String(per.size)],
+          ].map(([k, v]) => (
+            <div key={k}>
+              <p className="text-[11px] text-dim">{k}</p>
+              <p className="font-mono text-lg font-semibold">{v}</p>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-between text-xs">
+          <span className="text-dim">Bought <span className="font-mono text-up">{usdEth(bought)}</span></span>
+          <span className="text-dim">Sold <span className="font-mono text-down">{usdEth(sold)}</span></span>
+        </div>
+        <div>
+          <p className="mb-1.5 text-[11px] text-dim">Activity, last 13 weeks</p>
+          <div className="grid grid-flow-col grid-rows-7 gap-[3px]">
+            {counts.map((c, i) => (
+              <span key={i} title={`${c} trade${c === 1 ? "" : "s"}`} className="aspect-square rounded-[2px] bg-panel-2" style={c ? { background: "var(--color-accent-fg)", opacity: 0.25 + (0.75 * c) / max } : undefined} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PortfolioView() {
   const params = useSearchParams();
   const { address } = useAccount();
@@ -213,6 +293,7 @@ function PortfolioView() {
           <Stat label="Creator fees to claim" value={ready && e.loaded ? fmtUsd(feesUsd) : dash} sub="from tokens that pay you" />
           <Stat label="Launched" value={ready ? data.created.length : dash} sub="the tokens you created" />
         </div>
+        {ready && <Analytics data={data} ethUsd={ethUsd} />}
 
         <section>
           <h2 className="mb-6 font-serif text-4xl">Holdings</h2>

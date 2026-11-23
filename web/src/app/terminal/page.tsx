@@ -446,6 +446,21 @@ export default function TerminalPage() {
     return () => removeEventListener("keel-tracker", f);
   }, []);
   const cols = src === "base" ? BASE_COLS : COLS;
+  const [shown, setShown] = useState<boolean[]>([true, true, true]);
+  const [disp, setDisp] = useState(false);
+  useEffect(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem("keel-pulse-cols") || "null");
+      if (Array.isArray(v) && v.length === 3) setShown(v);
+    } catch {}
+  }, []);
+  const toggleCol = (i: number) => {
+    const n = shown.map((x, k) => (k === i ? !x : x));
+    if (!n.some(Boolean)) return;
+    setShown(n);
+    localStorage.setItem("keel-pulse-cols", JSON.stringify(n));
+    if (!n[tab]) setTab(n.findIndex(Boolean));
+  };
   return (
     <div className="relative left-1/2 -mb-20 flex h-[calc(100dvh-8.5rem)] w-screen -translate-x-1/2 flex-col border-t border-line lg:h-[calc(100dvh-5.5rem)]">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-3 py-2">
@@ -465,11 +480,30 @@ export default function TerminalPage() {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <div className="relative">
+            <button onClick={() => setDisp((v) => !v)} className={`h-8 rounded-md border px-2.5 text-xs ${disp ? "border-accent text-fg" : "border-line text-muted hover:text-fg"}`}>Display</button>
+            {disp && (
+              <div className="absolute right-0 top-9 z-30 w-52 space-y-1 rounded-xl border border-line bg-panel p-3 text-xs shadow-xl">
+                <p className="pb-1 text-dim">Columns</p>
+                {cols.map((c, i) => (
+                  <label key={c.sort} className="flex cursor-pointer items-center justify-between py-1">
+                    <span>{c.title}</span>
+                    <input type="checkbox" checked={shown[i]} onChange={() => toggleCol(i)} className="accent-[var(--color-accent)]" />
+                  </label>
+                ))}
+                <label className="flex cursor-pointer items-center justify-between border-t border-line pt-2">
+                  <span>Wallet tracker</span>
+                  <input type="checkbox" checked={tracker} onChange={() => setTracker((v) => !v)} className="accent-[var(--color-accent)]" />
+                </label>
+                <p className="pt-1 text-dim">Filters are on each column header.</p>
+              </div>
+            )}
+          </div>
           <PresetBar />
         </div>
       </div>
       <div className="flex border-b border-line lg:hidden">
-        {cols.map((c, i) => (
+        {cols.map((c, i) => !shown[i] ? null : (
           <button key={c.sort} onClick={() => setTab(i)} className={`-mb-px flex-1 border-b-2 py-2.5 text-sm ${tab === i ? "border-accent text-fg" : "border-transparent text-muted"}`}>
             {c.title}
           </button>
@@ -478,8 +512,8 @@ export default function TerminalPage() {
       <div className="flex min-h-0 flex-1">
         {tracker && <Tracker onClose={() => setTracker(false)} />}
         {src === "base"
-          ? BASE_COLS.map((c, i) => <BaseColumn key={`b${c.sort}`} sort={c.sort} title={c.title} buy={relayBuy} hidden={tab !== i} view={view} />)
-          : COLS.map((c, i) => <Column key={c.sort} sort={c.sort} title={c.title} buy={buy} hidden={tab !== i} view={view} />)}
+          ? BASE_COLS.map((c, i) => !shown[i] ? null : <BaseColumn key={`b${c.sort}`} sort={c.sort} title={c.title} buy={relayBuy} hidden={tab !== i} view={view} />)
+          : COLS.map((c, i) => !shown[i] ? null : <Column key={c.sort} sort={c.sort} title={c.title} buy={buy} hidden={tab !== i} view={view} />)}
       </div>
     </div>
   );
