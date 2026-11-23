@@ -1,4 +1,5 @@
 "use client";
+import type { Net } from "@/lib/net";
 /* eslint-disable @next/next/no-img-element */
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -17,9 +18,15 @@ export const LAUNCHPADS: Record<string, { name: string; site: string }> = {
   mintclub: { name: "Mint Club", site: "mint.club" },
   baseline: { name: "Baseline", site: "baseline.markets" },
   flaunch: { name: "Flaunch", site: "flaunch.gg" },
+  pump: { name: "Pump.fun", site: "pump.fun" },
+  launchlab: { name: "LaunchLab", site: "raydium.io" },
+  moonshot: { name: "Moonshot", site: "moonshot.money" },
+  believe: { name: "Believe", site: "believe.app" },
+  bags: { name: "Bags", site: "bags.fm" },
 };
 const DEX_LP: Record<string, string> = {
   bankr: "bankr", "o1-launchpad": "o1", "virtuals-base": "virtuals", "virtuals-unicorn-base": "virtuals", "mint-club-base": "mintclub", "baseline-base": "baseline",
+  "pump-fun": "pump", pumpswap: "pump", "raydium-launchlab": "launchlab", moonshot: "moonshot", "meteora-dbc": "believe",
 };
 export const lpIcon = (id: string) => `https://www.google.com/s2/favicons?domain=${LAUNCHPADS[id]?.site ?? `${id}.com`}&sz=64`;
 
@@ -42,15 +49,15 @@ const loadMeta = (a: string) =>
     timer ??= setTimeout(flush, 60);
   });
 
-export function useTokenMeta(address: string) {
+export function useTokenMeta(address: string, net: Net = "base") {
   const a = address.toLowerCase();
-  return useQuery({ queryKey: ["tmeta", a], queryFn: () => loadMeta(a), staleTime: 3600_000, gcTime: 3600_000, retry: false }).data;
+  return useQuery({ queryKey: ["tmeta", a], queryFn: () => loadMeta(a), enabled: net === "base", staleTime: 3600_000, gcTime: 3600_000, retry: false }).data;
 }
 
 const O1_PREFIX = "0xb20000000000000000000";
 
 export function launchpadOf(dex: string, m?: TokenMeta, address = "") {
-  return m?.lp ?? DEX_LP[dex] ?? (address.toLowerCase().startsWith(O1_PREFIX) ? "o1" : null);
+  return m?.lp ?? DEX_LP[dex] ?? (address.toLowerCase().startsWith(O1_PREFIX) ? "o1" : /pump$/.test(address) ? "pump" : /bonk$/.test(address) ? "launchlab" : /BAGS$/.test(address) ? "bags" : null);
 }
 
 export function LaunchpadChip({ id }: { id: string }) {
@@ -63,8 +70,8 @@ export function LaunchpadChip({ id }: { id: string }) {
   );
 }
 
-export function PoolAvatar({ token, dex, dexLabel, size }: { token: { address: string; symbol: string; image: string | null }; dex: string; dexLabel: string; size: number }) {
-  const m = useTokenMeta(token.address);
+export function PoolAvatar({ token, dex, dexLabel, size, net = "base" }: { token: { address: string; symbol: string; image: string | null }; dex: string; dexLabel: string; size: number; net?: Net }) {
+  const m = useTokenMeta(token.address, net);
   const lp = launchpadOf(dex, m, token.address);
   return (
     <div className="relative shrink-0">
@@ -78,6 +85,6 @@ export function PoolAvatar({ token, dex, dexLabel, size }: { token: { address: s
   );
 }
 
-export function useLaunchpad(address: string, dex: string) {
-  return launchpadOf(dex, useTokenMeta(address), address);
+export function useLaunchpad(address: string, dex: string, net: Net = "base") {
+  return launchpadOf(dex, useTokenMeta(address, net), address);
 }

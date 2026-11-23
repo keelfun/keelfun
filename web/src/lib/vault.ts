@@ -4,6 +4,7 @@ import { createPublicClient, createWalletClient, fallback, http, type Hex } from
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { chain, RPC_URL } from "./config";
 import { BASE_RPCS } from "./wagmi";
+import { mainnet } from "viem/chains";
 
 export type VaultWallet = { name: string; pk: Hex; address: `0x${string}` };
 export type TokenMeta = { address: `0x${string}`; symbol: string; name: string; decimals: number; image: string | null; keel?: boolean };
@@ -177,6 +178,14 @@ export async function restoreRaw(raw: string) {
 
 export const vaultTransport = () => fallback([...BASE_RPCS.map((u) => http(u)), http(RPC_URL)]);
 export const vaultPublic = () => createPublicClient({ chain, transport: vaultTransport() });
+const ETH_RPCS = ["https://ethereum-rpc.publicnode.com", "https://eth.llamarpc.com", "https://eth.drpc.org"];
+const ethTransport = () => fallback(ETH_RPCS.map((u) => http(u)));
+/** Ethereum mainnet clients for terminal trades on ETH; trading wallets use the same address on every EVM chain. */
+export const ethPublic = () => createPublicClient({ chain: mainnet, transport: ethTransport() });
+export function ethClient(w: VaultWallet) {
+  touch();
+  return createWalletClient({ account: privateKeyToAccount(w.pk), chain: mainnet, transport: ethTransport() });
+}
 export function vaultClient(w: VaultWallet) {
   touch();
   return createWalletClient({ account: privateKeyToAccount(w.pk), chain, transport: vaultTransport() });

@@ -8,20 +8,26 @@ import { useAccount, useReadContracts } from "wagmi";
 import { baseMeta, Bolt, PresetBar, QuickSell, usePrefs, useRelayBuy } from "./QuickBuy";
 import { useStats } from "@/lib/api";
 import type { PoolDetail, PoolTrade } from "@/lib/basePools";
-import { chain, EXPLORER } from "@/lib/config";
+import { chain } from "@/lib/config";
 import { fmtCompact, fmtPrice, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
 import { useSet } from "@/lib/sets";
 import { errMsg } from "@/lib/tx";
 import { useVault } from "@/lib/vault";
+import { explorerAddr, explorerTx, normAddr, type Net } from "@/lib/net";
+import { splBalance, useSol } from "@/lib/sol";
 
 type Sec = Record<string, any>;
-export function useSecurity(token?: string) {
+export function useSecurity(token?: string, net: Net = "base") {
   return useQuery({
-    queryKey: ["goplus", token],
+    queryKey: ["goplus", net, token],
     queryFn: async () => {
-      const r = await fetch(`https://api.gopluslabs.io/api/v1/token_security/${chain.id}?contract_addresses=${token}`);
+      const path = net === "solana" ? "solana/token_security" : `token_security/${net === "eth" ? 1 : chain.id}`;
+      const r = await fetch(`https://api.gopluslabs.io/api/v1/${path}?contract_addresses=${token}`);
       const j = await r.json();
-      return (j.result?.[token!.toLowerCase()] ?? null) as Sec | null;
+      const res = j.result ?? {};
+      const v = (res[token!] ?? res[token!.toLowerCase()] ?? null) as Sec | null;
+      if (v && net === "solana") v.holders = ((v.holders ?? []) as any[]).map((h) => ({ ...h, address: h.address ?? h.account }));
+      return v;
     },
     enabled: !!token,
     staleTime: 300_000,
@@ -33,6 +39,7 @@ const DEAD = /^0x0{40}$|^0x0{36}dead$/i;
 const pct = (v: unknown) => (v == null || v === "" ? null : Number(v) * 100);
 
 export function SecurityCard({ p, sec, loading }: { p: PoolDetail; sec: Sec | null | undefined; loading: boolean }) {
+  if (p.net === "solana") return <SolSecurity p={p} sec={sec} loading={loading} />;
   const top10 = sec?.holders ? (sec.holders as any[]).slice(0, 10).reduce((s, h) => s + Number(h.percent || 0) * 100, 0) : null;
   const buyTax = pct(sec?.buy_tax);
   const sellTax = pct(sec?.sell_tax);
@@ -69,19 +76,66 @@ export function SecurityCard({ p, sec, loading }: { p: PoolDetail; sec: Sec | nu
   );
 }
 
+function SolSecurity({ p, sec, loading }: { p: PoolDetail; sec: Sec | null | undefined; loading: boolean }) {
+  const top10 = sec?.holders ? (sec.holders as any[]).slice(0, 10).reduce((s, h) => s + Number(h.percent || 0) * 100, 0) : null;
+  const st = (v: any, yes: string, no: string): [string, "good" | "bad" | "warn" | null] => (v?.status == null ? ["—", null] : v.status === "1" ? [yes, "bad"] : [no, "good"]);
+  const fee = sec?.transfer_fee?.current_fee_rate?.fee_rate;
+  const rows: [string, [string, "good" | "bad" | "warn" | null]][] = [
+    ["Mint authority", st(sec?.mintable, "Active", "Revoked")],
+    ["Freeze authority", st(sec?.freezable, "Active", "Revoked")],
+    ["Metadata", sec?.metadata_mutable?.status == null ? ["—", null] : sec.metadata_mutable.status === "1" ? ["Mutable", "warn"] : ["Immutable", "good"]],
+    ["Transfer fee", fee == null ? ["None", sec ? "good" : null] : [`${(Number(fee) / 100).toFixed(2)}%`, Number(fee) > 1000 ? "bad" : "warn"]],
+    ["Transfer hook", sec ? ((sec.transfer_hook ?? []).length ? ["Yes", "bad"] : ["No", "good"]) : ["—", null]],
+    ["Holders", sec?.holder_count ? [fmtCompact(Number(sec.holder_count)), null] : ["—", null]],
+    ["Top 10 holders", top10 == null ? ["—", null] : [`${top10.toFixed(1)}%`, top10 > 50 ? "warn" : "good"]],
+    ["LP locked", p.lockedPct == null ? ["—", null] : [`${p.lockedPct.toFixed(0)}%`, p.lockedPct >= 90 ? "good" : "warn"]],
+  ];
+  const tone = { good: "text-up", bad: "text-down", warn: "text-warn" } as const;
+  return (
+    <div className="rounded-xl border border-line bg-panel p-3">
+      <div className="mb-2 flex items-center text-xs">
+        <span className="font-semibold">Security info</span>
+        {loading && <span className="ml-auto text-dim">checking…</span>}
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+        {rows.map(([k, [v, t]]) => (
+          <div key={k} className="contents">
+            <dt className="text-muted">{k}</dt>
+            <dd className={`text-right font-mono ${t ? tone[t] : "text-fg"}`}>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 text-[10px] text-dim">Checks by GoPlus. Not a guarantee, always verify the token.</p>
+    </div>
+  );
+}
+
+function WalletLink({ a, net }: { a: string; net: Net }) {
+  return net === "base" ? (
+    <Link href={`/portfolio/?w=${a}`} className="text-muted hover:text-accent-fg">{shortAddr(a)}</Link>
+  ) : (
+    <a href={explorerAddr(net, a)} target="_blank" rel="noreferrer" className="text-muted hover:text-accent-fg">{shortAddr(a)}</a>
+  );
+}
+
 function usePosition(p: PoolDetail) {
   const v = useVault();
-  const ws = v.data?.wallets ?? [];
-  const a = p.token.address.toLowerCase();
+  const sol = useSol();
+  const evm = p.net !== "solana";
+  const ws = evm ? (v.data?.wallets ?? []) : [];
+  const a = normAddr(p.token.address);
   const bal = useReadContracts({
-    contracts: ws.map((w) => ({ address: p.token.address as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [w.address], chainId: chain.id }) as const),
+    contracts: ws.map((w) => ({ address: p.token.address as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [w.address], chainId: p.net === "eth" ? 1 : chain.id }) as const),
     query: { enabled: ws.length > 0, refetchInterval: 15000 },
   });
-  const held = (bal.data ?? []).reduce((s, x) => s + (x.status === "success" ? Number(formatUnits(x.result as bigint, p.token.decimals)) : 0), 0);
+  const spl = useQuery({ queryKey: ["spl", sol.address, p.token.address], queryFn: () => splBalance(sol.address!, p.token.address), enabled: !evm && !!sol.address, refetchInterval: 15000 });
+  const held = evm
+    ? (bal.data ?? []).reduce((s, x) => s + (x.status === "success" ? Number(formatUnits(x.result as bigint, p.token.decimals)) : 0), 0)
+    : spl.data ? Number(formatUnits(spl.data.raw, spl.data.decimals)) : 0;
   const acts = (v.data?.activity ?? []).filter((x) => x.token === a);
   const bought = acts.filter((x) => x.side === "buy").reduce((s, x) => s + (x.eth ?? 0), 0);
   const sold = acts.filter((x) => x.side === "sell").reduce((s, x) => s + (x.eth ?? 0), 0);
-  return { unlocked: !!v.data, held, bought, sold };
+  return { unlocked: evm ? !!v.data : !!sol.address, held, bought, sold };
 }
 
 export function TradePanel({ p }: { p: PoolDetail }) {
@@ -131,11 +185,12 @@ export function TradePanel({ p }: { p: PoolDetail }) {
           </button>
           {s && s !== "busy" && s !== "ok" && <p className="text-xs text-down">{s}</p>}
           <p className="text-[11px] text-dim">
+            {p.net !== "base" && <>Paid with ETH on Base, delivered on {p.net === "eth" ? "Ethereum" : "Solana"} through Relay. </>}
             {v.data ? `From your P${prefs.active + 1} trading wallets, no popup.` : <>From your connected wallet. <Link href="/wallets/" className="text-accent-fg hover:underline">Set up trading wallets</Link> for one-click buys.</>}
           </p>
         </>
       ) : (
-        <QuickSell meta={baseMeta(p.token)} />
+        <QuickSell meta={baseMeta(p.token)} net={p.net} />
       )}
       <div className="flex items-center justify-between gap-2 border-t border-line pt-3">
         <span className="text-xs text-dim">Preset</span>
@@ -166,16 +221,17 @@ export function PairTabs({ p, trades, loading, sec }: { p: PoolDetail; trades: P
   const tracked = useSet("keel-tracked");
   const v = useVault();
   const { address } = useAccount();
-  const mine = new Set([...(v.data?.wallets ?? []).map((w) => w.address.toLowerCase()), ...(address ? [address.toLowerCase()] : [])]);
-  const dev = String(sec?.creator_address ?? "").toLowerCase();
+  const sol = useSol();
+  const mine = new Set([...(v.data?.wallets ?? []).map((w) => w.address.toLowerCase()), ...(address ? [address.toLowerCase()] : []), ...(sol.address ? [sol.address] : [])]);
+  const dev = normAddr(String(sec?.creator_address ?? sec?.creators?.[0]?.address ?? ""));
   const tag = (a: string) => (a === dev ? "DEV" : mine.has(a) ? "YOU" : tracked.includes(a) ? "TRACKED" : null);
   const rows = (trades ?? []).filter((r) => {
-    const a = r.from.toLowerCase();
+    const a = normAddr(r.from);
     return who === "all" || (who === "dev" ? a === dev : who === "you" ? mine.has(a) : tracked.includes(a));
   });
   const traders = Object.values(
     (trades ?? []).reduce<Record<string, { a: string; bought: number; sold: number; n: number }>>((m, r) => {
-      const a = r.from.toLowerCase();
+      const a = normAddr(r.from);
       const x = (m[a] ??= { a, bought: 0, sold: 0, n: 0 });
       if (r.kind === "buy") x.bought += r.usd;
       else x.sold += r.usd;
@@ -219,12 +275,12 @@ export function PairTabs({ p, trades, loading, sec }: { p: PoolDetail; trades: P
             <tbody className="font-mono">
               {rows.map((r) => (
                 <tr key={r.tx + r.from + r.usd} className="border-b border-line/60">
-                  <td className="px-3 py-2 text-muted"><a href={`${EXPLORER}/tx/${r.tx}`} target="_blank" rel="noreferrer" className="hover:text-fg">{timeAgo(r.ts)} ago ↗</a></td>
+                  <td className="px-3 py-2 text-muted"><a href={explorerTx(p.net, r.tx)} target="_blank" rel="noreferrer" className="hover:text-fg">{timeAgo(r.ts)} ago ↗</a></td>
                   <td className={`px-3 py-2 font-sans ${r.kind === "buy" ? "text-up" : "text-down"}`}>{r.kind === "buy" ? "Buy" : "Sell"}</td>
                   <td className="px-3 py-2 text-right">${fmtPrice(r.priceUsd)}</td>
                   <td className="px-3 py-2 text-right">{fmtCompact(r.tokenAmount)} <span className="text-dim">{p.token.symbol}</span></td>
                   <td className={`px-3 py-2 text-right ${r.kind === "buy" ? "text-up" : "text-down"}`}>{fmtUsd(r.usd)}</td>
-                  <td className="px-3 py-2 text-right"><Link href={`/portfolio/?w=${r.from}`} className="text-muted hover:text-accent-fg">{shortAddr(r.from)}</Link><Tag a={r.from.toLowerCase()} /></td>
+                  <td className="px-3 py-2 text-right"><WalletLink a={r.from} net={p.net} /><Tag a={normAddr(r.from)} /></td>
                 </tr>
               ))}
             </tbody>
@@ -244,7 +300,7 @@ export function PairTabs({ p, trades, loading, sec }: { p: PoolDetail; trades: P
             <tbody className="font-mono">
               {traders.map((t) => (
                 <tr key={t.a} className="border-b border-line/60">
-                  <td className="px-3 py-2"><Link href={`/portfolio/?w=${t.a}`} className="text-muted hover:text-accent-fg">{shortAddr(t.a)}</Link><Tag a={t.a} /></td>
+                  <td className="px-3 py-2"><WalletLink a={t.a} net={p.net} /><Tag a={t.a} /></td>
                   <td className="px-3 py-2 text-right text-up">{fmtUsd(t.bought)}</td>
                   <td className="px-3 py-2 text-right text-down">{fmtUsd(t.sold)}</td>
                   <td className={`px-3 py-2 text-right ${t.sold - t.bought >= 0 ? "text-up" : "text-down"}`}>{t.sold - t.bought >= 0 ? "+" : "-"}{fmtUsd(Math.abs(t.sold - t.bought))}</td>
@@ -265,13 +321,13 @@ export function PairTabs({ p, trades, loading, sec }: { p: PoolDetail; trades: P
             </thead>
             <tbody className="font-mono">
               {holders.map((h, i) => {
-                const a = h.address.toLowerCase();
+                const a = normAddr(h.address);
                 const share = Number(h.percent) * 100;
                 return (
                   <tr key={a} className="border-b border-line/60">
                     <td className="px-3 py-2 text-dim">{i + 1}</td>
                     <td className="px-3 py-2">
-                      <Link href={`/portfolio/?w=${a}`} className="text-muted hover:text-accent-fg">{shortAddr(a)}</Link>
+                      <WalletLink a={a} net={p.net} />
                       <Tag a={a} />
                       {(h.tag || h.is_locked || h.is_contract) && <span className="ml-1.5 font-sans text-[10px] text-dim">{h.tag || (h.is_locked ? "locked" : "contract")}</span>}
                     </td>

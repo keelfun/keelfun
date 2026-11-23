@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useReadContracts } from "wagmi";
 import { TokenAvatar } from "./TokenAvatar";
 import { fetchBasePools, fetchPoolsByToken } from "@/lib/basePools";
+import { addrOnNet, pairHref, useNet } from "@/lib/net";
 import { chain } from "@/lib/config";
 import { fmtPct, fmtUsd } from "@/lib/format";
 import { useSet } from "@/lib/sets";
@@ -51,10 +52,11 @@ export function WalletChip({ compact = false }: { compact?: boolean }) {
 }
 
 export function TickerStrip() {
-  const watch = useSet("keel-watch");
+  const net = useNet();
+  const watch = useSet("keel-watch").filter((a) => addrOnNet(a, net));
   const { data } = useQuery({
-    queryKey: ["ticker-strip", watch.join()],
-    queryFn: () => (watch.length ? fetchPoolsByToken(watch) : fetchBasePools("trending")),
+    queryKey: ["ticker-strip", net, watch.join()],
+    queryFn: () => (watch.length ? fetchPoolsByToken(watch, net) : fetchBasePools("trending", "", "1h", net)),
     refetchInterval: 60000,
     staleTime: 30000,
   });
@@ -66,7 +68,7 @@ export function TickerStrip() {
         <span className="text-dim">{watch.length ? "Watchlist" : "Trending"}</span>
       </span>
       {items.map((p) => (
-        <Link key={p.pool} href={`/pair/?p=${p.pool}`} className="flex shrink-0 items-center gap-1.5 text-muted hover:text-fg">
+        <Link key={p.pool} href={pairHref(p.pool, p.net)} className="flex shrink-0 items-center gap-1.5 text-muted hover:text-fg">
           <TokenAvatar src={p.token.image} symbol={p.token.symbol} size={16} />
           <span className="font-medium text-fg">{p.token.symbol}</span>
           <span className="font-mono">{fmtUsd(p.mcUsd)}</span>

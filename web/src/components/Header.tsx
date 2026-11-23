@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { BRAND, chain } from "@/lib/config";
 import { ConnectButton } from "./ConnectButton";
 import { LangButton, ThemeButton } from "./Prefs";
+import { NetPicker } from "./NetPicker";
 import { SearchK } from "./SearchK";
 import { TickerStrip, WalletChip } from "./TerminalChrome";
 
@@ -213,9 +214,7 @@ function TerminalHeader({ active }: { active: (h: string) => boolean }) {
         </nav>
         <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
           <SearchK wide />
-          <span className="hidden h-9 items-center gap-1.5 rounded-lg border border-line px-2.5 text-xs font-medium xl:flex" title="Base mainnet">
-            <span className="h-3.5 w-3.5 rounded-[3px] bg-accent" />Base
-          </span>
+          <NetPicker />
           <Link href="/wallets/" className="hidden h-9 items-center rounded-lg bg-accent px-3.5 text-sm font-semibold text-accent-ink hover:opacity-90 md:flex">Deposit</Link>
           <WalletChip />
           <GearMenu />

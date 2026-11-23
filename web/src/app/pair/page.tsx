@@ -1,5 +1,7 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 import { pushRecent, toggleSet, useSet } from "@/lib/sets";
+import { normAddr, type Net } from "@/lib/net";
 import { PairTabs, SecurityCard, TradePanel, useSecurity } from "@/components/PairTrade";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -10,7 +12,7 @@ import { AnySwap } from "@/components/AnySwap";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { api, type Token } from "@/lib/api";
 import { DEX_LABEL, fetchOhlcv, fetchPool, fetchPoolTrades, fetchTokenTopPool, type PoolDetail } from "@/lib/basePools";
-import { EXPLORER } from "@/lib/config";
+import { explorerToken, getNet, NETS, parseNet, setNet } from "@/lib/net";
 import { fmtCompact, fmtPrice, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
 
 const TF = [
@@ -23,7 +25,7 @@ const TF = [
 ] as const;
 const css = (v: string, fb: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || fb;
 
-function Chart({ pool, supply }: { pool: string; supply: number }) {
+function Chart({ pool, supply, net }: { pool: string; supply: number; net: Net }) {
   const [tf, setTf] = useState(1);
   const [mc, setMc] = useState(false);
   const el = useRef<HTMLDivElement>(null);
@@ -31,7 +33,7 @@ function Chart({ pool, supply }: { pool: string; supply: number }) {
   const cs = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const vs = useRef<ISeriesApi<"Histogram"> | null>(null);
   const t = TF[tf];
-  const { data } = useQuery({ queryKey: ["ohlcv", pool, t.l], queryFn: () => fetchOhlcv(pool, t.tf, t.a), refetchInterval: 30000, retry: 2 });
+  const { data } = useQuery({ queryKey: ["ohlcv", net, pool, t.l], queryFn: () => fetchOhlcv(pool, t.tf, t.a, net), refetchInterval: 30000, retry: 2 });
   useEffect(() => {
     if (!el.current) return;
     const up = css("--color-up", "#2ee6a6"), down = css("--color-down", "#ff5c7a"), line = css("--color-line", "#1c2436"), accent = css("--color-accent-fg", "#3c8aff");
@@ -82,26 +84,31 @@ function Chart({ pool, supply }: { pool: string; supply: number }) {
 function PairView() {
   const params = useSearchParams();
   const router = useRouter();
-  const poolParam = params.get("p")?.toLowerCase() ?? "";
+  const net: Net = parseNet(params.get("n")) ?? "base";
+  const norm = (v: string | null) => (v ? normAddr(v) : "");
+  const poolParam = norm(params.get("p"));
   useEffect(() => {
     if (poolParam) pushRecent(poolParam);
   }, [poolParam]);
-  const tokenParam = params.get("t")?.toLowerCase() ?? "";
-  const resolved = useQuery({ queryKey: ["toppool", tokenParam], queryFn: () => fetchTokenTopPool(tokenParam), enabled: !poolParam && !!tokenParam });
+  useEffect(() => {
+    if (getNet() !== net && /^terminal\.|^localhost$/.test(location.hostname)) setNet(net);
+  }, [net]);
+  const tokenParam = norm(params.get("t"));
+  const resolved = useQuery({ queryKey: ["toppool", net, tokenParam], queryFn: () => fetchTokenTopPool(tokenParam, net), enabled: !poolParam && !!tokenParam });
   const pool = poolParam || resolved.data || "";
-  const { data: p, error } = useQuery({ queryKey: ["pool", pool], queryFn: () => fetchPool(pool), enabled: !!pool, refetchInterval: 30000, retry: 2 });
-  const keel = useQuery({ queryKey: ["is-keel", p?.token.address], queryFn: async () => {
+  const { data: p, error } = useQuery({ queryKey: ["pool", net, pool], queryFn: () => fetchPool(pool, net), enabled: !!pool, refetchInterval: 30000, retry: 2 });
+  const keel = useQuery({ queryKey: ["is-keel", p?.token.address], enabled: !!p && net === "base", queryFn: async () => {
       const a = p!.token.address.toLowerCase();
       const r = await api<{ tokens: Token[] }>(`/tokens?q=${a}&limit=5`);
       return r.tokens.some((t) => t.address.toLowerCase() === a) || null;
-    }, enabled: !!p, retry: false });
+    }, retry: false });
   useEffect(() => {
     if (keel.data && p) router.replace(`/token/?a=${p.token.address}`);
   }, [keel.data, p, router]);
-  const trades = useQuery({ queryKey: ["ptrades", pool], queryFn: () => fetchPoolTrades(pool, p!.token.address), enabled: !!p, refetchInterval: 20000 });
+  const trades = useQuery({ queryKey: ["ptrades", net, pool], queryFn: () => fetchPoolTrades(pool, p!.token.address, net), enabled: !!p, refetchInterval: 20000 });
   const [copied, setCopied] = useState(false);
-  const sec = useSecurity(p?.token.address);
-  const watched = useSet("keel-watch").includes(p?.token.address.toLowerCase() ?? "-");
+  const sec = useSecurity(p?.token.address, net);
+  const watched = useSet("keel-watch").includes(p ? normAddr(p.token.address) : "-");
 
   if (!pool) return <p className="py-20 text-center text-sm text-muted">{resolved.isLoading ? "Finding the main pool…" : "No pair selected."}</p>;
   if (error) return <p className="py-20 text-center text-sm text-down">{(error as Error).message}</p>;
@@ -134,8 +141,9 @@ function PairView() {
                 {copied ? "copied" : shortAddr(p.token.address)} ⧉
               </button>
               <span className="rounded border border-line px-1.5">{DEX_LABEL[p.dex] ?? p.dex}</span>
-              <a href={`${EXPLORER}/token/${p.token.address}`} target="_blank" rel="noreferrer" className="hover:text-fg">Basescan ↗</a>
-              <a href={`https://dexscreener.com/base/${p.pool}`} target="_blank" rel="noreferrer" className="hover:text-fg">DexScreener ↗</a>
+              <span className="flex items-center gap-1 rounded border border-line px-1.5"><img src={NETS[net].logo} alt="" className="h-3 w-3 rounded-full" />{NETS[net].label}</span>
+              <a href={explorerToken(net, p.token.address)} target="_blank" rel="noreferrer" className="hover:text-fg">{NETS[net].explorerName} ↗</a>
+              <a href={`https://dexscreener.com/${NETS[net].ds}/${p.pool}`} target="_blank" rel="noreferrer" className="hover:text-fg">DexScreener ↗</a>
               <a href={`https://x.com/search?q=${encodeURIComponent(`$${p.token.symbol} OR ${p.token.address}`)}&f=live`} target="_blank" rel="noreferrer" className="hover:text-fg">X ↗</a>
             </div>
           </div>
@@ -152,18 +160,23 @@ function PairView() {
       </div>
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
-          <Chart pool={p.pool} supply={supply} />
+          <Chart pool={p.pool} supply={supply} net={net} />
         </div>
         <aside className="space-y-3 lg:sticky lg:top-28 lg:row-span-2 lg:self-start">
           <TradePanel p={p} />
           <SecurityCard p={p} sec={sec.data} loading={sec.isLoading} />
-          <details className="rounded-xl border border-line bg-panel p-3">
-            <summary className="cursor-pointer text-xs font-semibold">Swap with any token</summary>
-            <div className="mt-3">
-              <AnySwap initialGet={p.token.address} />
-            </div>
-          </details>
-          <p className="text-[11px] leading-relaxed text-dim">Swaps route through Relay at the best price on Base. Anyone can create a token on Base, including copies of real names, so check the contract first.</p>
+          {net === "base" && (
+            <details className="rounded-xl border border-line bg-panel p-3">
+              <summary className="cursor-pointer text-xs font-semibold">Swap with any token</summary>
+              <div className="mt-3">
+                <AnySwap initialGet={p.token.address} />
+              </div>
+            </details>
+          )}
+          <p className="text-[11px] leading-relaxed text-dim">
+            {net === "base" ? "Swaps route through Relay at the best price on Base." : net === "eth" ? "Buys route through Relay from Base ETH to Ethereum. Sells need a little ETH on Ethereum for gas." : "Buys route through Relay from Base ETH to your Solana address. Sells go to SOL through Jupiter."}{" "}
+            Anyone can create a token, including copies of real names, so check the contract first.
+          </p>
         </aside>
         <div className="min-w-0">
           <PairTabs p={p} trades={trades.data} loading={trades.isLoading} sec={sec.data} />

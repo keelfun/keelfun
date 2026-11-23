@@ -9,6 +9,7 @@ import { LaunchpadChip, PoolAvatar, useLaunchpad } from "@/components/PoolAvatar
 import { api, useTokens, type Portfolio, type Token } from "@/lib/api";
 import { fetchBasePools, type BasePool } from "@/lib/basePools";
 import { pairInfo } from "@/lib/config";
+import { explorerToken, NETS, normAddr, pairHref, useNet, type Net } from "@/lib/net";
 import { fmtCompact, fmtPct, fmtPrice, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
 import { errMsg } from "@/lib/tx";
 
@@ -48,7 +49,7 @@ function useSet(key: string) {
     return () => (removeEventListener(SETS_EVT, f), removeEventListener("storage", f));
   }, [key]);
   const toggle = (a: string) => {
-    const x = a.toLowerCase();
+    const x = normAddr(a);
     const cur = readSet(key);
     localStorage.setItem(key, JSON.stringify(cur.includes(x) ? cur.filter((y) => y !== x) : [...cur, x]));
     dispatchEvent(new Event(SETS_EVT));
@@ -127,10 +128,10 @@ function LaneControls({ lane, set }: { lane: Lane; set: (v: Partial<Lane>) => vo
   );
 }
 
-function RowTools({ address, symbol }: { address: string; symbol: string }) {
+function RowTools({ address, symbol, net = "base" }: { address: string; symbol: string; net?: Net }) {
   const [watch, toggleWatch] = useWatch();
   const [hidden, toggleHidden] = useHidden();
-  const a = address.toLowerCase();
+  const a = normAddr(address);
   const on = watch.includes(a);
   const off = hidden.includes(a);
   const stop = (f: () => void) => (e: React.MouseEvent) => (e.preventDefault(), e.stopPropagation(), f());
@@ -145,7 +146,7 @@ function RowTools({ address, symbol }: { address: string; symbol: string }) {
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill={on ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z" /></svg>
       </button>
       {ext(`https://x.com/search?q=${encodeURIComponent(`$${symbol} OR ${address}`)}&f=live`, "Search on X", <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor"><path d="M18.2 2.3h3.4l-7.4 8.4 8.7 11.5h-6.8l-5.3-7-6.1 7H1.3l7.9-9L.8 2.3h7l4.8 6.4zm-1.2 17.9h1.9L7 4.2H5z" /></svg>)}
-      {ext(`https://basescan.org/token/${address}`, "Basescan", <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6" /><path d="m20 20-4.5-4.5" /></svg>)}
+      {ext(explorerToken(net, address), NETS[net].explorerName, <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="6" /><path d="m20 20-4.5-4.5" /></svg>)}
       <button onClick={stop(() => toggleHidden(a))} className={off ? "text-down" : "text-dim hover:text-fg"} title={off ? "Unhide pair" : "Hide pair"} aria-label="Hide">
         <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 3l18 18M10.6 6.1A10 10 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3 3.7M6.6 6.6A17 17 0 0 0 2.5 12S6 18 12 18a9 9 0 0 0 4.4-1.1" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>
       </button>
@@ -308,12 +309,12 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
     setTimeout(() => setState(""), 4000);
   };
   const t = p.token;
-  const lp = useLaunchpad(t.address, p.dex);
+  const lp = useLaunchpad(t.address, p.dex, p.net);
   return (
-    <Link href={`/pair/?p=${p.pool}`} className="group block border-b border-line px-3 py-2.5 transition-colors hover:bg-panel-2/60">
+    <Link href={pairHref(p.pool, p.net)} className="group block border-b border-line px-3 py-2.5 transition-colors hover:bg-panel-2/60">
       <div className="flex gap-3">
         <div className="relative shrink-0">
-          <PoolAvatar token={t} dex={p.dex} dexLabel={DEX[p.dex] ?? p.dex.replace(/-base$/, "").slice(0, 8)} size={52} />
+          <PoolAvatar net={p.net} token={t} dex={p.dex} dexLabel={DEX[p.dex] ?? p.dex.replace(/-(base|ethereum|eth|solana)$/, "").slice(0, 8)} size={52} />
           <p className="mt-1.5 text-center font-mono text-[10px] text-dim">{t.address.slice(0, 4)}…{t.address.slice(-3)}</p>
         </div>
         <div className="min-w-0 flex-1">
@@ -339,7 +340,7 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
               {fmtCompact(p.traders, 1)}
             </span>
             <a
-              href={`https://www.geckoterminal.com/base/pools/${p.pool}`}
+              href={`https://www.geckoterminal.com/${NETS[p.net].gt}/pools/${p.pool}`}
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
@@ -348,7 +349,7 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
             >
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 3v18h18" /><path d="m7 14 4-4 3 3 5-6" /></svg>
             </a>
-            <RowTools address={t.address} symbol={t.symbol} />
+            <RowTools address={t.address} symbol={t.symbol} net={p.net} />
             </div>
             <button
               onClick={go}
@@ -387,20 +388,21 @@ function BaseColumn({ sort, title, buy, hidden, view }: ColProps<BasePool>) {
   const [watch] = useWatch();
   const [hid] = useHidden();
   const [dq, setDq] = useState("");
+  const net = useNet();
   useEffect(() => {
     const t = setTimeout(() => setDq(q.trim()), 400);
     return () => clearTimeout(t);
   }, [q]);
   const { data, isLoading, error } = useQuery({
-    queryKey: ["base-pools", sort, dq],
-    queryFn: async () => ({ pools: await fetchBasePools(sort, dq) }),
+    queryKey: ["base-pools", net, sort, dq],
+    queryFn: async () => ({ pools: await fetchBasePools(sort, dq, "1h", net) }),
     refetchInterval: 30000,
     retry: 3,
     retryDelay: (n) => 2000 * (n + 1),
     staleTime: 15000,
   });
   const list = data?.pools.filter((p) => {
-    const a = p.token.address.toLowerCase();
+    const a = normAddr(p.token.address);
     if (view === "watch" && !watch.includes(a)) return false;
     if (!lane.showHidden && hid.includes(a)) return false;
     return passLane(lane, { liq: p.liqUsd, vol: p.vol24, mc: p.mcUsd, created: p.createdAt });
@@ -413,14 +415,14 @@ function BaseColumn({ sort, title, buy, hidden, view }: ColProps<BasePool>) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search Base"
+          placeholder={`Search ${NETS[net].label}`}
           className="ml-auto h-7 w-24 min-w-0 rounded-md border border-line bg-bg px-2 text-xs outline-none focus:border-accent"
         />
         <LaneControls lane={lane} set={setLane} />
       </div>
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
         {list?.map((p) => <BaseRow key={p.pool} p={p} amount={amount} buy={(x, a) => buy(x, a, lane.p)} />)}
-        {isLoading && <p className="p-6 text-center text-xs text-dim">Loading Base pairs…</p>}
+        {isLoading && <p className="p-6 text-center text-xs text-dim">Loading {NETS[net].label} pairs…</p>}
         {error && !data && <p className="p-6 text-center text-xs text-dim">{(error as Error).message}</p>}
         {list && list.length === 0 && <p className="p-6 text-center text-xs text-dim">{view === "watch" ? "No watchlisted pairs here. Tap ☆ on a row." : "No pairs match."}</p>}
       </div>
@@ -431,7 +433,9 @@ function BaseColumn({ sort, title, buy, hidden, view }: ColProps<BasePool>) {
 export default function TerminalPage() {
   const [tab, setTab] = useState(0);
   const [tracker, setTracker] = useState(false);
-  const [src, setSrc] = useState<"base" | "keel">("base");
+  const [srcPick, setSrc] = useState<"base" | "keel">("base");
+  const net = useNet();
+  const src = net === "base" ? srcPick : "base";
   const [view, setView] = useState<"all" | "watch">("all");
   const [watch] = useWatch();
   const { prefs, preset } = usePrefs();
@@ -470,7 +474,7 @@ export default function TerminalPage() {
         <h1 className="text-base font-bold italic">Pulse</h1>
         <span className="flex items-center gap-1.5 text-xs text-up"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />live</span>
         <div className="flex rounded-lg border border-line p-0.5 text-xs">
-          {([["base", "All Base"], ["keel", "Keelfun"]] as const).map(([k, l]) => (
+          {([["base", `All ${NETS[net].label}`], ...(net === "base" ? [["keel", "Keelfun"]] : [])] as ["base" | "keel", string][]).map(([k, l]) => (
             <button key={k} onClick={() => setSrc(k)} className={`rounded-md px-2.5 py-1 ${src === k ? "bg-panel-2 text-fg" : "text-muted hover:text-fg"}`}>{l}</button>
           ))}
         </div>

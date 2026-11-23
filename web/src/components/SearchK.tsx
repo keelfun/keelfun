@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { TokenAvatar } from "./TokenAvatar";
 import { api, type Token } from "@/lib/api";
 import { fetchBasePools } from "@/lib/basePools";
+import { isSolAddr, NETS, pairHref, tokenHref, useNet } from "@/lib/net";
 import { fmtUsd, shortAddr } from "@/lib/format";
 
 type Item = { key: string; href: string; img: string | null; title: string; sub: string; right?: string; tag: string };
@@ -37,18 +38,21 @@ export function SearchK({ wide = false }: { wide?: boolean }) {
     const t = setTimeout(() => setDq(q.trim()), 300);
     return () => clearTimeout(t);
   }, [q]);
+  const net = useNet();
   const isAddr = /^0x[0-9a-fA-F]{40}$/.test(dq);
+  const isSol = net === "solana" && isSolAddr(dq);
   const keel = useQuery({ queryKey: ["k-search", dq], queryFn: () => api<{ tokens: Token[]; ethUsd: number }>(`/tokens?sort=top&q=${encodeURIComponent(dq)}&limit=6`), enabled: open && dq.length > 0 });
-  const base = useQuery({ queryKey: ["b-search", dq], queryFn: () => fetchBasePools("", dq), enabled: open && dq.length > 1, retry: 1 });
+  const base = useQuery({ queryKey: ["b-search", net, dq], queryFn: () => fetchBasePools("", dq, "1h", net), enabled: open && dq.length > 1, retry: 1 });
   const items: Item[] = [];
   if (isAddr) {
     items.push({ key: "w", href: `/portfolio/?w=${dq}`, img: null, title: "Open wallet", sub: shortAddr(dq), tag: "Wallet" });
-    items.push({ key: "t", href: `/pair/?t=${dq.toLowerCase()}`, img: null, title: "Open token", sub: shortAddr(dq), tag: "Token" });
+    items.push({ key: "t", href: tokenHref(dq.toLowerCase(), net === "solana" ? "base" : net), img: null, title: "Open token", sub: shortAddr(dq), tag: "Token" });
   }
+  if (isSol) items.push({ key: "t", href: tokenHref(dq, "solana"), img: null, title: "Open token", sub: shortAddr(dq), tag: "Solana" });
   for (const t of keel.data?.tokens ?? [])
     items.push({ key: `k${t.address}`, href: `/token/?a=${t.address}`, img: t.image, title: t.symbol, sub: t.name, right: fmtUsd(t.fdvEth * (keel.data?.ethUsd ?? 0)), tag: "Keelfun" });
   for (const p of (base.data ?? []).slice(0, 8))
-    items.push({ key: `b${p.pool}`, href: `/pair/?p=${p.pool}`, img: p.token.image, title: `${p.token.symbol} / ${p.quote}`, sub: p.token.name, right: fmtUsd(p.mcUsd), tag: "Base" });
+    items.push({ key: `b${p.pool}`, href: pairHref(p.pool, p.net), img: p.token.image, title: `${p.token.symbol} / ${p.quote}`, sub: p.token.name, right: fmtUsd(p.mcUsd), tag: NETS[p.net].label });
   const go = (h: string) => {
     setOpen(false);
     router.push(h);

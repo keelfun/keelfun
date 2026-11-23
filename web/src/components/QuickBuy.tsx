@@ -1,17 +1,19 @@
 "use client";
+import { NETS, type Net } from "@/lib/net";
+import { solAddress, solSell, splBalance, useSol } from "@/lib/sol";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { erc20Abi, formatUnits, parseEther } from "viem";
 import { usePublicClient, useSendTransaction, useWriteContract } from "wagmi";
-import { ETH, getQuote } from "@/components/AnySwap";
+import { ETH, getQuote, type Route } from "@/components/AnySwap";
 import { launchRouterAbi } from "@/lib/abis";
 import type { Token } from "@/lib/api";
 import type { BasePool } from "@/lib/basePools";
 import { ADDR, chain } from "@/lib/config";
 import { fmtCompact } from "@/lib/format";
 import { errMsg, useConfirm, useEnsureWallet } from "@/lib/tx";
-import { useVault, vaultActions, vaultClient, vaultPlan, vaultPublic, vaultSellWallets, type TokenMeta } from "@/lib/vault";
+import { ethClient, ethPublic, useVault, vaultActions, vaultClient, vaultPlan, vaultPublic, vaultSellWallets, type TokenMeta } from "@/lib/vault";
 import { vaultSell } from "@/lib/vaultHoldings";
 
 export type Preset = { amount: string; slippage: number };
@@ -176,14 +178,18 @@ export function useRelayBuy() {
   const ensureWallet = useEnsureWallet();
   const confirm = useConfirm();
   const { sendTransactionAsync } = useSendTransaction();
-  return async (pool: Pick<BasePool, "token">, p: Preset) => {
+  return async (pool: Pick<BasePool, "token"> & { net?: Net }, p: Preset) => {
+    const net = pool.net ?? "base";
+    const recipient = net === "solana" ? solAddress() : undefined;
+    if (net === "solana" && !recipient) throw new Error("Connect a Solana wallet or paste a receive address first");
+    const route: Route = { dest: NETS[net].relay, recipient: recipient ?? undefined };
     const plan = vaultPlan(load().active, Number(p.amount || 0));
     if (plan.length) {
       const pub = vaultPublic();
       const t = pool.token;
       await Promise.all(
         plan.map(async ({ w, amount }) => {
-          const q = await getQuote(w.address, ETH, { address: t.address, symbol: t.symbol, name: t.name, decimals: t.decimals }, parseEther(amount.toFixed(18)).toString());
+          const q = await getQuote(w.address, ETH, { address: t.address, symbol: t.symbol, name: t.name, decimals: t.decimals }, parseEther(amount.toFixed(18)).toString(), undefined, route);
           const c = vaultClient(w);
           let last = "";
           for (const s of q.steps) {
@@ -194,7 +200,7 @@ export function useRelayBuy() {
               last = h;
             }
           }
-          await vaultActions.record(w.address, { address: t.address as `0x${string}`, symbol: t.symbol, name: t.name, decimals: t.decimals, image: t.image ?? null }, { side: "buy", eth: amount, hash: last });
+          if (net === "base") await vaultActions.record(w.address, { address: t.address as `0x${string}`, symbol: t.symbol, name: t.name, decimals: t.decimals, image: t.image ?? null }, { side: "buy", eth: amount, hash: last });
         }),
       );
       return;
@@ -203,7 +209,7 @@ export function useRelayBuy() {
     const wei = parseEther(p.amount || "0");
     if (wei === 0n) throw new Error("Set a quick buy amount");
     const t = pool.token;
-    const q = await getQuote(user, ETH, { address: t.address, symbol: t.symbol, name: t.name, decimals: t.decimals }, wei.toString());
+    const q = await getQuote(user, ETH, { address: t.address, symbol: t.symbol, name: t.name, decimals: t.decimals }, wei.toString(), undefined, route);
     for (const s of q.steps) {
       if (s.kind !== "transaction") continue;
       for (const it of s.items) {
@@ -217,10 +223,10 @@ export function useRelayBuy() {
 export const keelMeta = (t: Pick<Token, "address" | "symbol" | "name" | "image">): TokenMeta => ({ address: t.address, symbol: t.symbol, name: t.name, decimals: 18, image: t.image ?? null, keel: true });
 export const baseMeta = (t: BasePool["token"]): TokenMeta => ({ address: t.address as `0x${string}`, symbol: t.symbol, name: t.name, decimals: t.decimals, image: t.image ?? null });
 
-async function heldBy(meta: TokenMeta) {
+async function heldBy(meta: TokenMeta, net: Net = "base") {
   const ws = vaultSellWallets(load().active);
   if (!ws.length) return [];
-  const bals = await vaultPublic().multicall({
+  const bals = await (net === "eth" ? ethPublic() : vaultPublic()).multicall({
     contracts: ws.map((w) => ({ address: meta.address, abi: erc20Abi, functionName: "balanceOf", args: [w.address] }) as const),
     allowFailure: true,
   });
@@ -228,32 +234,63 @@ async function heldBy(meta: TokenMeta) {
 }
 
 /** Sells pct% of a token from every trading wallet that holds it. */
-export function useQuickSell() {
+export function useQuickSell(net: Net = "base") {
   return async (meta: TokenMeta, pct: number) => {
-    if (!vaultSellWallets(0).length) throw new Error("Unlock your trading wallets to quick sell");
-    const held = await heldBy(meta);
-    if (!held.length) throw new Error(`No ${meta.symbol} in your trading wallets`);
     const p = load();
     const slip = p.presets[p.active]?.slippage ?? 15;
+    if (net === "solana") {
+      const owner = solAddress();
+      if (!owner) throw new Error("Connect your Solana wallet to sell");
+      const { raw } = await splBalance(owner, meta.address);
+      if (raw === 0n) throw new Error(`No ${meta.symbol} in your Solana wallet`);
+      await solSell(meta.address, pct >= 100 ? raw : (raw * BigInt(pct)) / 100n, slip);
+      return;
+    }
+    if (!vaultSellWallets(0).length) throw new Error("Unlock your trading wallets to quick sell");
+    const held = await heldBy(meta, net);
+    if (!held.length) throw new Error(`No ${meta.symbol} in your trading wallets`);
+    if (net === "eth") {
+      await Promise.all(held.map(({ w, raw }) => ethSell(w, meta, pct >= 100 ? raw : (raw * BigInt(pct)) / 100n)));
+      return;
+    }
     await Promise.all(held.map(({ w, raw }) => vaultSell(w, { meta, raw, amount: 0, usd: 0 }, pct, slip)));
   };
 }
 
-function useHeld(meta: TokenMeta, enabled: boolean) {
+/** Sells an Ethereum mainnet token from a trading wallet back to ETH on Base. Gas is paid in mainnet ETH. */
+async function ethSell(w: Parameters<typeof ethClient>[0], meta: TokenMeta, raw: bigint) {
+  if (raw === 0n) throw new Error("Nothing to sell");
+  const pub = ethPublic();
+  if ((await pub.getBalance({ address: w.address })) === 0n) throw new Error(`${w.name} needs a little ETH on Ethereum for gas`);
+  const q = await getQuote(w.address, { address: meta.address, symbol: meta.symbol, name: meta.name, decimals: meta.decimals }, ETH, raw.toString(), undefined, { origin: 1, dest: chain.id });
+  const c = ethClient(w);
+  for (const s of q.steps) {
+    if (s.kind !== "transaction") continue;
+    for (const it of s.items) {
+      const h = await c.sendTransaction({ to: it.data.to, data: it.data.data, value: BigInt(it.data.value || "0") });
+      if ((await pub.waitForTransactionReceipt({ hash: h })).status !== "success") throw new Error(`Sell reverted for ${w.name}`);
+    }
+  }
+}
+
+function useHeld(meta: TokenMeta, enabled: boolean, net: Net = "base") {
   const { prefs } = usePrefs();
+  const sol = useSol();
   return useQuery({
-    queryKey: ["qs-held", meta.address.toLowerCase(), prefs.active],
-    enabled,
+    queryKey: ["qs-held", net, meta.address, prefs.active, sol.address],
+    enabled: net === "solana" ? !!sol.address : enabled,
     refetchInterval: 15000,
-    queryFn: async () => (await heldBy(meta)).reduce((a, x) => a + x.raw, 0n),
+    queryFn: async () => (net === "solana" ? (await splBalance(sol.address!, meta.address)).raw : (await heldBy(meta, net)).reduce((a, x) => a + x.raw, 0n)),
   });
 }
 
 /** Quick sell panel for a token page: 25% / 50% / 100% from trading wallets. */
-export function QuickSell({ meta }: { meta: TokenMeta }) {
+export function QuickSell({ meta, net = "base" }: { meta: TokenMeta; net?: Net }) {
   const v = useVault();
-  const sell = useQuickSell();
-  const held = useHeld(meta, !!v.data);
+  const sol = useSol();
+  const sell = useQuickSell(net);
+  const held = useHeld(meta, !!v.data, net);
+  const ready = net === "solana" ? sol.canSign : !!v.data;
   const [s, setS] = useState<{ pct: number; msg: string } | null>(null);
   const go = async (pct: number) => {
     setS({ pct, msg: "busy" });
@@ -271,9 +308,11 @@ export function QuickSell({ meta }: { meta: TokenMeta }) {
     <div className="rounded-xl border border-line bg-panel p-3">
       <div className="mb-2 flex items-center text-xs">
         <span className="font-semibold">Quick sell</span>
-        {v.data && <span className="ml-auto font-mono text-dim">Held {held.data == null ? "…" : fmtCompact(amt)} {meta.symbol}</span>}
+        {(net === "solana" ? !!sol.address : !!v.data) && <span className="ml-auto font-mono text-dim">Held {held.data == null ? "…" : fmtCompact(amt)} {meta.symbol}</span>}
       </div>
-      {!v.data ? (
+      {net === "solana" && !ready ? (
+        <p className="text-xs text-dim">Sells to SOL through Jupiter with your Solana wallet. <SolConnectLink /></p>
+      ) : !ready ? (
         <p className="text-xs text-dim">
           Sells straight from your trading wallets, no popup. <Link href="/wallets/" className="text-accent-fg hover:underline">{v.exists ? "Unlock wallets" : "Create a trading wallet"}</Link>
         </p>
@@ -302,6 +341,7 @@ export function RowSell({ meta, className = "h-8 px-2.5" }: { meta: TokenMeta; c
   const { sellPct } = usePrefs();
   const sell = useQuickSell();
   const [s, setS] = useState("");
+  if (!/^0x/.test(meta.address)) return null;
   const a = meta.address.toLowerCase();
   const tracked = !!v.data && Object.values(v.data.tokens ?? {}).some((l) => l.some((x) => x.address.toLowerCase() === a));
   if (!tracked) return null;
@@ -325,6 +365,19 @@ export function RowSell({ meta, className = "h-8 px-2.5" }: { meta: TokenMeta; c
       className={`flex shrink-0 items-center rounded-lg border font-mono text-xs font-semibold ${className} ${s === "ok" ? "border-down bg-down/20 text-down" : s && s !== "busy" ? "border-down/60 text-down" : "border-down/50 bg-down/10 text-down hover:bg-down/20"}`}
     >
       {s === "busy" ? "…" : s === "ok" ? "Sold" : s ? "Failed" : `S ${sellPct}%`}
+    </button>
+  );
+}
+
+function SolConnectLink() {
+  const [e, setE] = useState("");
+  return (
+    <button
+      onClick={() => import("@/lib/sol").then((m) => m.connectSol()).then(() => setE(""), (x) => setE(errMsg(x)))}
+      className="text-accent-fg hover:underline"
+      title={e || undefined}
+    >
+      {e ? "No Solana wallet found" : "Connect Phantom"}
     </button>
   );
 }

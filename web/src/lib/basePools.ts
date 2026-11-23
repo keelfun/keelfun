@@ -1,16 +1,17 @@
 import { erc20Abi } from "viem";
 import { vaultPublic } from "./vault";
+import { NETS, normAddr, type Net } from "./net";
 export type BasePool = {
-  pool: string; dex: string; createdAt: number; quote: string;
+  net: Net; pool: string; dex: string; createdAt: number; quote: string;
   token: { address: string; symbol: string; name: string; image: string | null; decimals: number };
   priceUsd: number; mcUsd: number; liqUsd: number; vol24: number; chg5m: number; chg1h: number; chg6h: number; chg24: number; buys: number; sells: number; traders: number;
 };
 
 const GT = "https://api.geckoterminal.com/api/v2";
-const PATHS: Record<string, string> = {
-  new: "/networks/base/new_pools?include=base_token,dex",
-  trending: "/networks/base/trending_pools?include=base_token,dex",
-  top: "/networks/base/pools?sort=h24_volume_usd_desc&include=base_token,dex",
+const PATHS: Record<string, (g: string) => string> = {
+  new: (g) => `/networks/${g}/new_pools?include=base_token,dex`,
+  trending: (g) => `/networks/${g}/trending_pools?include=base_token,dex`,
+  top: (g) => `/networks/${g}/pools?sort=h24_volume_usd_desc&include=base_token,dex`,
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -91,22 +92,23 @@ async function ds<T>(path: string): Promise<T> {
   return r.json();
 }
 /** Converts DexScreener pairs into the GeckoTerminal list shape so normalize() handles both. */
-function dsToGt(pairs: DsPair[]): GtList {
+function dsToGt(pairs: DsPair[], net: Net = "base"): GtList {
+  const pre = NETS[net].gt;
   const included: { id: string; attributes: Record<string, any> }[] = [];
   const data = pairs
-    .filter((p) => p.chainId === "base")
+    .filter((p) => p.chainId === NETS[net].ds)
     .map((p): GtPool => {
       const bt = p.baseToken ?? {};
       const qt = p.quoteToken ?? {};
-      const bid = `base_${String(bt.address).toLowerCase()}`;
-      const qid = `base_${String(qt.address).toLowerCase()}`;
+      const bid = `${pre}_${normAddr(String(bt.address))}`;
+      const qid = `${pre}_${normAddr(String(qt.address))}`;
       included.push({ id: bid, attributes: { address: bt.address, symbol: bt.symbol, name: bt.name, image_url: p.info?.imageUrl ?? null } });
       included.push({ id: qid, attributes: { address: qt.address, symbol: qt.symbol, name: qt.name, image_url: null } });
       const lbl = (p.labels?.[0] ?? "").toLowerCase();
-      const dex = p.dexId === "uniswap" && lbl ? `uniswap-${lbl}-base` : p.dexId === "aerodrome" ? "aerodrome-base" : String(p.dexId);
+      const dex = p.dexId === "uniswap" && lbl ? `uniswap-${lbl}-${pre}` : p.dexId === "aerodrome" ? "aerodrome-base" : String(p.dexId);
       return {
         attributes: {
-          address: String(p.pairAddress).toLowerCase(),
+          address: normAddr(String(p.pairAddress)),
           name: `${bt.symbol} / ${qt.symbol}`,
           pool_created_at: p.pairCreatedAt ? new Date(p.pairCreatedAt).toISOString() : null,
           base_token_price_usd: p.priceUsd,
@@ -125,12 +127,34 @@ function dsToGt(pairs: DsPair[]): GtList {
 
 type GtList = { data?: GtPool[]; included?: { id: string; attributes: Record<string, any> }[] };
 
-export async function fetchBasePools(kind: string, q = "", duration = "1h"): Promise<BasePool[]> {
-  const path = q ? `/search/pools?query=${encodeURIComponent(q)}&network=base&include=base_token,dex` : `${PATHS[kind]}${kind === "trending" ? `&duration=${duration}` : ""}`;
-  return normalize(await gt<GtList>(path, q ? async () => dsToGt((await ds<{ pairs?: DsPair[] }>(`/latest/dex/search?q=${encodeURIComponent(q)}`)).pairs ?? []) : undefined));
+/** DexScreener has no per-chain pool feed; build one from its boosted/latest token lists for that chain. */
+async function dsList(kind: string, net: Net): Promise<GtList> {
+  const c = NETS[net].ds;
+  const lists = await Promise.all(
+    (kind === "new" ? ["/token-profiles/latest/v1", "/token-boosts/latest/v1"] : ["/token-boosts/top/v1", "/token-boosts/latest/v1", "/token-profiles/latest/v1"]).map((u) =>
+      ds<{ chainId: string; tokenAddress: string }[]>(u).catch(() => [])
+    )
+  );
+  const addrs = [...new Set(lists.flat().filter((x) => x.chainId === c).map((x) => x.tokenAddress))].slice(0, 30);
+  if (!addrs.length) return { data: [], included: [] };
+  const pairs = await ds<DsPair[]>(`/tokens/v1/${c}/${addrs.join(",")}`);
+  const best = new Map<string, DsPair>();
+  for (const x of pairs) {
+    const k = String(x.baseToken?.address);
+    if (!addrs.includes(k)) continue;
+    if ((best.get(k)?.liquidity?.usd ?? -1) < (x.liquidity?.usd ?? 0)) best.set(k, x);
+  }
+  const score = (x: DsPair) => (kind === "new" ? x.pairCreatedAt ?? 0 : kind === "top" ? x.volume?.h24 ?? 0 : (x.txns?.h1?.buys ?? 0) + (x.txns?.h1?.sells ?? 0));
+  return dsToGt([...best.values()].sort((a, b) => score(b) - score(a)), net);
 }
 
-function normalize(j: GtList): BasePool[] {
+export async function fetchBasePools(kind: string, q = "", duration = "1h", net: Net = "base"): Promise<BasePool[]> {
+  const g = NETS[net].gt;
+  const path = q ? `/search/pools?query=${encodeURIComponent(q)}&network=${g}&include=base_token,dex` : `${PATHS[kind](g)}${kind === "trending" ? `&duration=${duration}` : ""}`;
+  return normalize(await gt<GtList>(path, q ? async () => dsToGt((await ds<{ pairs?: DsPair[] }>(`/latest/dex/search?q=${encodeURIComponent(q)}`)).pairs ?? [], net) : () => dsList(kind, net)), net);
+}
+
+function normalize(j: GtList, net: Net = "base"): BasePool[] {
   const inc = new Map((j.included ?? []).map((x) => [x.id, x.attributes]));
   const seen = new Set<string>();
   return (j.data ?? [])
@@ -141,16 +165,17 @@ function normalize(j: GtList): BasePool[] {
       const tx = a.transactions?.h24 ?? {};
       const [base, quote] = String(a.name ?? "").split(" / ");
       return {
-        pool: String(a.address),
+        net,
+        pool: normAddr(String(a.address)),
         dex: p.relationships.dex?.data?.id ?? "",
         createdAt: Math.floor(Date.parse(a.pool_created_at) / 1000) || 0,
         quote: (quote ?? "").split(" ")[0],
         token: {
-          address: String(bt.address ?? bid.replace(/^base_/, "")).toLowerCase(),
+          address: normAddr(String(bt.address ?? bid.replace(/^[a-z0-9-]+_/, ""))),
           symbol: String(bt.symbol ?? base ?? "?"),
           name: String(bt.name ?? base ?? ""),
           image: bt.image_url && !String(bt.image_url).includes("missing") ? String(bt.image_url) : null,
-          decimals: num(bt.decimals) || 18,
+          decimals: num(bt.decimals) || (net === "solana" ? 6 : 18),
         },
         priceUsd: num(a.base_token_price_usd),
         mcUsd: num(a.market_cap_usd) || num(a.fdv_usd),
@@ -170,21 +195,21 @@ function normalize(j: GtList): BasePool[] {
 
 export type PoolDetail = BasePool & { quoteAddress: string; quoteImage: string | null; feePct: number; lockedPct: number | null; vol1h: number; vol6h: number; buys1h: number; sells1h: number };
 
-export async function fetchPool(pool: string): Promise<PoolDetail> {
-  const j = await gt<{ data: GtPool; included?: { id: string; attributes: Record<string, any> }[] }>(`/networks/base/pools/${pool}?include=base_token,quote_token,dex`, async () => {
-    const l = dsToGt((await ds<{ pairs?: DsPair[] }>(`/latest/dex/pairs/base/${pool}`)).pairs ?? []);
+export async function fetchPool(pool: string, net: Net = "base"): Promise<PoolDetail> {
+  const j = await gt<{ data: GtPool; included?: { id: string; attributes: Record<string, any> }[] }>(`/networks/${NETS[net].gt}/pools/${pool}?include=base_token,quote_token,dex`, async () => {
+    const l = dsToGt((await ds<{ pairs?: DsPair[] }>(`/latest/dex/pairs/${NETS[net].ds}/${pool}`)).pairs ?? [], net);
     if (!l.data?.length) throw new Error("Not found");
     const bt = l.included?.find((x) => x.id === l.data![0].relationships.base_token?.data?.id);
-    if (bt) bt.attributes.decimals = await vaultPublic().readContract({ address: bt.attributes.address, abi: erc20Abi, functionName: "decimals" }).catch(() => 18);
+    if (bt && net === "base") bt.attributes.decimals = await vaultPublic().readContract({ address: bt.attributes.address, abi: erc20Abi, functionName: "decimals" }).catch(() => 18);
     return { data: l.data[0], included: l.included };
   });
-  const [base] = normalize({ data: [j.data], included: j.included });
+  const [base] = normalize({ data: [j.data], included: j.included }, net);
   const a = j.data.attributes;
   const qid = j.data.relationships.quote_token?.data?.id ?? "";
   const qt = (j.included ?? []).find((x) => x.id === qid)?.attributes ?? {};
   return {
     ...base,
-    quoteAddress: String(qt.address ?? qid.replace(/^base_/, "")).toLowerCase(),
+    quoteAddress: normAddr(String(qt.address ?? qid.replace(/^[a-z0-9-]+_/, ""))),
     quoteImage: qt.image_url && !String(qt.image_url).includes("missing") ? String(qt.image_url) : null,
     feePct: num(a.pool_fee_percentage),
     lockedPct: a.locked_liquidity_percentage == null ? null : num(a.locked_liquidity_percentage),
@@ -196,17 +221,17 @@ export async function fetchPool(pool: string): Promise<PoolDetail> {
 }
 
 export type Ohlcv = { time: number; open: number; high: number; low: number; close: number; volume: number };
-export async function fetchOhlcv(pool: string, tf: "minute" | "hour" | "day", aggregate: number): Promise<Ohlcv[]> {
-  const j = await gt<{ data: { attributes: { ohlcv_list: number[][] } } }>(`/networks/base/pools/${pool}/ohlcv/${tf}?aggregate=${aggregate}&limit=300&currency=usd`);
+export async function fetchOhlcv(pool: string, tf: "minute" | "hour" | "day", aggregate: number, net: Net = "base"): Promise<Ohlcv[]> {
+  const j = await gt<{ data: { attributes: { ohlcv_list: number[][] } } }>(`/networks/${NETS[net].gt}/pools/${pool}/ohlcv/${tf}?aggregate=${aggregate}&limit=300&currency=usd`);
   return j.data.attributes.ohlcv_list.map(([time, open, high, low, close, volume]) => ({ time, open, high, low, close, volume })).sort((x, y) => x.time - y.time);
 }
 
 export type PoolTrade = { tx: string; ts: number; from: string; kind: "buy" | "sell"; tokenAmount: number; usd: number; priceUsd: number };
-export async function fetchPoolTrades(pool: string, token: string): Promise<PoolTrade[]> {
-  const j = await gt<{ data: { attributes: Record<string, any> }[] }>(`/networks/base/pools/${pool}/trades`);
+export async function fetchPoolTrades(pool: string, token: string, net: Net = "base"): Promise<PoolTrade[]> {
+  const j = await gt<{ data: { attributes: Record<string, any> }[] }>(`/networks/${NETS[net].gt}/pools/${pool}/trades`);
   return j.data.map(({ attributes: a }) => {
     const buy = a.kind === "buy";
-    const tokIsTo = String(a.to_token_address).toLowerCase() === token;
+    const tokIsTo = normAddr(String(a.to_token_address)) === normAddr(token);
     return {
       tx: String(a.tx_hash),
       ts: Math.floor(Date.parse(a.block_timestamp) / 1000),
@@ -219,16 +244,18 @@ export async function fetchPoolTrades(pool: string, token: string): Promise<Pool
   });
 }
 
-export async function fetchTokenTopPool(token: string): Promise<string | null> {
-  const j = await gt<GtList>(`/networks/base/tokens/${token}/pools?page=1`, async () =>
-    dsToGt((await ds<DsPair[]>(`/token-pairs/v1/base/${token}`)).sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))),
+export async function fetchTokenTopPool(token: string, net: Net = "base"): Promise<string | null> {
+  const j = await gt<GtList>(`/networks/${NETS[net].gt}/tokens/${token}/pools?page=1`, async () =>
+    dsToGt((await ds<DsPair[]>(`/token-pairs/v1/${NETS[net].ds}/${token}`)).sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0)), net),
   );
-  return j.data?.[0]?.attributes.address ?? null;
+  const a = j.data?.[0]?.attributes.address;
+  return a ? normAddr(String(a)) : null;
 }
 
 export const DEX_LABEL: Record<string, string> = {
   "uniswap-v4-base": "Uni v4", "uniswap-v3-base": "Uni v3", "uniswap-v2-base": "Uni v2", "aerodrome-base": "Aero",
-  "aero-slipstream-base": "Aero CL", "pancakeswap-v3-base": "Pancake", "sushiswap-v3-base": "Sushi", "baseswap": "BaseSwap",
+  "aero-slipstream-base": "Aero CL", "uniswap_v2": "Uni v2", "uniswap_v3": "Uni v3", "uniswap-v4-ethereum": "Uni v4", "uniswap-v4-eth": "Uni v4",
+  "raydium": "Raydium", "raydium-clmm": "Raydium CL", "raydium-launchlab": "LaunchLab", "pump-fun": "Pump", "pumpswap": "PumpSwap", "meteora": "Meteora", "meteora-dlmm": "Meteora", "meteora-damm-v2": "Meteora", "orca": "Orca", "pancakeswap-v3-base": "Pancake", "sushiswap-v3-base": "Sushi", "baseswap": "BaseSwap",
 };
 
 /** USD prices for Base tokens (DexScreener, highest-liquidity pair per token). */
@@ -247,19 +274,19 @@ export async function tokenPrices(addrs: string[]): Promise<Record<string, numbe
   return out;
 }
 
-export async function fetchPoolsByToken(addrs: string[]): Promise<BasePool[]> {
+export async function fetchPoolsByToken(addrs: string[], net: Net = "base"): Promise<BasePool[]> {
   if (!addrs.length) return [];
   const chunks: string[][] = [];
   for (let i = 0; i < addrs.length; i += 30) chunks.push(addrs.slice(i, i + 30));
-  const pairs = (await Promise.all(chunks.map((c) => ds<DsPair[]>(`/tokens/v1/base/${c.join(",")}`).catch(() => [] as DsPair[])))).flat();
+  const pairs = (await Promise.all(chunks.map((c) => ds<DsPair[]>(`/tokens/v1/${NETS[net].ds}/${c.join(",")}`).catch(() => [] as DsPair[])))).flat();
   pairs.sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0));
-  const out = normalize(dsToGt(pairs));
+  const out = normalize(dsToGt(pairs, net), net);
   return addrs.map((a) => out.find((p) => p.token.address === a)).filter(Boolean) as BasePool[];
 }
 
-export async function fetchPoolsByAddr(pools: string[]): Promise<BasePool[]> {
+export async function fetchPoolsByAddr(pools: string[], net: Net = "base"): Promise<BasePool[]> {
   if (!pools.length) return [];
-  const r = await ds<{ pairs?: DsPair[] }>(`/latest/dex/pairs/base/${pools.slice(0, 30).join(",")}`);
-  const out = normalize(dsToGt(r.pairs ?? []));
+  const r = await ds<{ pairs?: DsPair[] }>(`/latest/dex/pairs/${NETS[net].ds}/${pools.slice(0, 30).join(",")}`);
+  const out = normalize(dsToGt(r.pairs ?? [], net), net);
   return pools.map((p) => out.find((x) => x.pool === p)).filter(Boolean) as BasePool[];
 }

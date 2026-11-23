@@ -30,13 +30,14 @@ export async function search(term: string): Promise<Cur[]> {
   return Array.isArray(j) ? j.map((c) => ({ address: c.address.toLowerCase(), symbol: c.symbol, name: c.name, decimals: c.decimals, logo: c.metadata?.logoURI })) : [];
 }
 
-export async function getQuote(user: string, a: Cur, b: Cur, amount: string, signal?: AbortSignal) {
+export type Route = { origin?: number; dest?: number; recipient?: string };
+export async function getQuote(user: string, a: Cur, b: Cur, amount: string, signal?: AbortSignal, route: Route = {}) {
   const r = await fetch(`${RELAY}/quote`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     signal,
     body: JSON.stringify({
-      user, recipient: user, originChainId: chain.id, destinationChainId: chain.id,
+      user, recipient: route.recipient ?? user, originChainId: route.origin ?? chain.id, destinationChainId: route.dest ?? chain.id,
       originCurrency: a.address, destinationCurrency: b.address, amount, tradeType: "EXACT_INPUT",
     }),
   });

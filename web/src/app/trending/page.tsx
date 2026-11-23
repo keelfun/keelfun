@@ -6,6 +6,7 @@ import { baseMeta, Bolt, PresetBar, RowSell, usePrefs, useRelayBuy } from "@/com
 import { LaunchpadChip, PoolAvatar, useLaunchpad } from "@/components/PoolAvatar";
 import { DEX_LABEL, fetchBasePools, fetchPoolsByAddr, fetchPoolsByToken, type BasePool } from "@/lib/basePools";
 import { useSet } from "@/lib/sets";
+import { addrOnNet, NETS, pairHref, useNet } from "@/lib/net";
 import { fmtCompact, fmtPrice, fmtUsd, timeAgo } from "@/lib/format";
 import { errMsg } from "@/lib/tx";
 
@@ -57,7 +58,7 @@ function BuyBtn({ p }: { p: BasePool }) {
 }
 
 function Lp({ p }: { p: BasePool }) {
-  const lp = useLaunchpad(p.token.address, p.dex);
+  const lp = useLaunchpad(p.token.address, p.dex, p.net);
   return lp ? <LaunchpadChip id={lp} /> : null;
 }
 
@@ -66,11 +67,14 @@ export default function TrendingPage() {
   const [q, setQ] = useState("");
   const [cjk, setCjk] = useState(false);
   const [tab, setTab] = useState<"trending" | "watch" | "recent">("trending");
-  const watch = useSet("keel-watch");
-  const recent = useSet("keel-recent");
+  const net = useNet();
+  const watchAll = useSet("keel-watch");
+  const recentAll = useSet("keel-recent");
+  const watch = watchAll.filter((a) => addrOnNet(a, net));
+  const recent = recentAll.filter((a) => addrOnNet(a, net));
   const { data: all, isLoading, error } = useQuery({
-    queryKey: ["base-market", tab, dur, q.trim(), tab === "watch" ? watch.join() : tab === "recent" ? recent.join() : ""],
-    queryFn: () => (tab === "watch" ? fetchPoolsByToken(watch) : tab === "recent" ? fetchPoolsByAddr(recent) : fetchBasePools("trending", q.trim(), dur)),
+    queryKey: ["base-market", net, tab, dur, q.trim(), tab === "watch" ? watch.join() : tab === "recent" ? recent.join() : ""],
+    queryFn: () => (tab === "watch" ? fetchPoolsByToken(watch, net) : tab === "recent" ? fetchPoolsByAddr(recent, net) : fetchBasePools("trending", q.trim(), dur, net)),
     refetchInterval: 30000,
     retry: 3,
     retryDelay: (n) => 2000 * (n + 1),
@@ -87,14 +91,14 @@ export default function TrendingPage() {
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold italic">Market</h1>
-        <span className="text-sm text-muted">Trending on Base</span>
+        <span className="text-sm text-muted">Trending on {NETS[net].label}</span>
         <div className="flex rounded-lg border border-line p-0.5">
           {DUR.map((d) => (
             <button key={d} onClick={() => setDur(d)} className={`rounded-md px-2.5 py-1 font-mono text-xs ${dur === d ? "bg-panel-2 text-fg" : "text-dim hover:text-fg"}`}>{d}</button>
           ))}
         </div>
         <button onClick={() => setCjk((v) => !v)} className={`h-8 rounded-lg border px-2.5 text-xs ${cjk ? "border-accent text-accent-fg" : "border-line text-muted hover:text-fg"}`}>中 Chinese names</button>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Base tokens" className="h-8 w-48 rounded-lg border border-line bg-bg px-3 text-xs outline-none focus:border-accent" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${NETS[net].label} tokens`} className="h-8 w-48 rounded-lg border border-line bg-bg px-3 text-xs outline-none focus:border-accent" />
         <div className="ml-auto">
           <PresetBar />
         </div>
@@ -116,8 +120,8 @@ export default function TrendingPage() {
             {data?.map((p) => (
               <tr key={p.pool} className="border-b border-line/60 last:border-0 hover:bg-panel-2/50">
                 <td className="px-3 py-2.5">
-                  <Link href={`/pair/?p=${p.pool}`} className="flex items-center gap-2 sm:gap-3">
-                    <PoolAvatar token={p.token} dex={p.dex} dexLabel={DEX_LABEL[p.dex] ?? p.dex.replace(/-base$/, "").slice(0, 8)} size={44} />
+                  <Link href={pairHref(p.pool, p.net)} className="flex items-center gap-2 sm:gap-3">
+                    <PoolAvatar net={p.net} token={p.token} dex={p.dex} dexLabel={DEX_LABEL[p.dex] ?? p.dex.replace(/-(base|ethereum|eth|solana)$/, "").slice(0, 8)} size={44} />
                     <div className="min-w-0 max-w-[8.5rem] sm:max-w-none">
                       <p className="truncate"><b>{p.token.symbol}</b> <span className="hidden text-xs text-dim sm:inline">{p.token.name}</span></p>
                       <p className="truncate text-xs text-muted"><span className="text-up">{p.createdAt ? timeAgo(p.createdAt) : "—"}</span> · /{p.quote} <Lp p={p} /></p>
@@ -146,11 +150,11 @@ export default function TrendingPage() {
             ))}
           </tbody>
         </table>
-        {isLoading && <p className="p-8 text-center text-sm text-dim">Loading Base tokens…</p>}
+        {isLoading && <p className="p-8 text-center text-sm text-dim">Loading {NETS[net].label} tokens…</p>}
         {data && !data.length && !isLoading && <p className="p-8 text-center text-sm text-dim">{tab === "watch" ? "Your watchlist is empty. Star tokens in Pulse to add them." : tab === "recent" ? "Tokens you open will show up here." : "No tokens match."}</p>}
         {error && !data && <p className="p-8 text-center text-sm text-dim">{(error as Error).message}</p>}
       </div>
-      <p className="text-xs text-dim">Data from GeckoTerminal. Anyone can create a token on Base, including copies of real names. Check the contract before buying.</p>
+      <p className="text-xs text-dim">Data from GeckoTerminal. Anyone can create a token on {NETS[net].label}, including copies of real names. Check the contract before buying.</p>
     </div>
   );
 }
