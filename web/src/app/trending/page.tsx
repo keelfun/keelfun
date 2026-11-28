@@ -9,6 +9,7 @@ import { useSet } from "@/lib/sets";
 import { addrOnNet, NETS, pairHref, useNet } from "@/lib/net";
 import { fmtCompact, fmtPrice, fmtUsd, timeAgo } from "@/lib/format";
 import { errMsg } from "@/lib/tx";
+import { OfficialBadge } from "@/components/Official";
 
 const DUR = ["5m", "1h", "6h", "24h"] as const;
 
@@ -123,7 +124,7 @@ export default function TrendingPage() {
                   <Link href={pairHref(p.pool, p.net)} className="flex items-center gap-2 sm:gap-3">
                     <PoolAvatar net={p.net} token={p.token} dex={p.dex} dexLabel={dexLabel(p.dex)} size={44} />
                     <div className="min-w-0 max-w-[8.5rem] sm:max-w-none">
-                      <p className="truncate"><b>{p.token.symbol}</b> <span className="hidden text-xs text-dim sm:inline">{p.token.name}</span></p>
+                      <p className="truncate"><b>{p.token.symbol}</b> <OfficialBadge address={p.token.address} /> <span className="hidden text-xs text-dim sm:inline">{p.token.name}</span></p>
                       <p className="truncate text-xs text-muted"><span className="text-up">{p.createdAt ? timeAgo(p.createdAt) : "—"}</span> · /{p.quote} <Lp p={p} /></p>
                     </div>
                   </Link>

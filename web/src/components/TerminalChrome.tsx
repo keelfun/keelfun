@@ -9,6 +9,7 @@ import { chain } from "@/lib/config";
 import { fmtPct, fmtUsd } from "@/lib/format";
 import { useSet } from "@/lib/sets";
 import { useVault } from "@/lib/vault";
+import { OfficialBadge } from "./Official";
 
 const MULTICALL = "0xcA11bde05977b3631167028862bE2a173976CA11";
 const ethBalAbi = [{ type: "function", name: "getEthBalance", stateMutability: "view", inputs: [{ name: "addr", type: "address" }], outputs: [{ name: "balance", type: "uint256" }] }] as const;
@@ -71,6 +72,7 @@ export function TickerStrip() {
         <Link key={p.pool} href={pairHref(p.pool, p.net)} className="flex shrink-0 items-center gap-1.5 text-muted hover:text-fg">
           <TokenAvatar src={p.token.image} symbol={p.token.symbol} size={16} />
           <span className="font-medium text-fg">{p.token.symbol}</span>
+          <OfficialBadge address={p.token.address} size={12} />
           <span className="font-mono">{fmtUsd(p.mcUsd)}</span>
           <span className={`font-mono ${p.chg24 >= 0 ? "text-up" : "text-down"}`}>{fmtPct(p.chg24 / 100)}</span>
         </Link>

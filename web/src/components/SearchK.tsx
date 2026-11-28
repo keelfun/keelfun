@@ -8,8 +8,9 @@ import { api, type Token } from "@/lib/api";
 import { fetchBasePools } from "@/lib/basePools";
 import { isSolAddr, NETS, pairHref, tokenHref, useNet } from "@/lib/net";
 import { fmtUsd, shortAddr } from "@/lib/format";
+import { OfficialBadge } from "./Official";
 
-type Item = { key: string; href: string; img: string | null; title: string; sub: string; right?: string; tag: string };
+type Item = { key: string; href: string; img: string | null; title: string; sub: string; right?: string; tag: string; addr?: string };
 
 export function SearchK({ wide = false }: { wide?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -50,9 +51,9 @@ export function SearchK({ wide = false }: { wide?: boolean }) {
   }
   if (isSol) items.push({ key: "t", href: tokenHref(dq, "solana"), img: null, title: "Open token", sub: shortAddr(dq), tag: "Solana" });
   for (const t of keel.data?.tokens ?? [])
-    items.push({ key: `k${t.address}`, href: `/token/?a=${t.address}`, img: t.image, title: t.symbol, sub: t.name, right: fmtUsd(t.fdvEth * (keel.data?.ethUsd ?? 0)), tag: "Keelfun" });
+    items.push({ key: `k${t.address}`, href: `/token/?a=${t.address}`, img: t.image, title: t.symbol, sub: t.name, right: fmtUsd(t.fdvEth * (keel.data?.ethUsd ?? 0)), tag: "Keelfun", addr: t.address });
   for (const p of (base.data ?? []).slice(0, 8))
-    items.push({ key: `b${p.pool}`, href: pairHref(p.pool, p.net), img: p.token.image, title: `${p.token.symbol} / ${p.quote}`, sub: p.token.name, right: fmtUsd(p.mcUsd), tag: NETS[p.net].label });
+    items.push({ key: `b${p.pool}`, href: pairHref(p.pool, p.net), img: p.token.image, title: `${p.token.symbol} / ${p.quote}`, sub: p.token.name, right: fmtUsd(p.mcUsd), tag: NETS[p.net].label, addr: p.token.address });
   const go = (h: string) => {
     setOpen(false);
     router.push(h);
@@ -89,7 +90,7 @@ export function SearchK({ wide = false }: { wide?: boolean }) {
                   <button key={it.key} onMouseEnter={() => setSel(i)} onClick={() => go(it.href)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left ${sel === i ? "bg-panel-2" : ""}`}>
                     <TokenAvatar src={it.img} symbol={it.title} size={30} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{it.title}</p>
+                      <p className="flex items-center gap-1.5 truncate text-sm font-medium">{it.title}<OfficialBadge address={it.addr} /></p>
                       <p className="truncate text-xs text-dim">{it.sub}</p>
                     </div>
                     {it.right && <span className="font-mono text-xs text-muted">{it.right}</span>}

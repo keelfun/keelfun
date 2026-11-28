@@ -10,6 +10,7 @@ import { keelMeta, QuickSell } from "@/components/QuickBuy";
 import { useFees, useHolders, useToken, useTrades, type FeeEvent, type Token } from "@/lib/api";
 import { EXPLORER, pairInfo } from "@/lib/config";
 import { fmtCompact, fmtEth, fmtPct, fmtPrice, fmtValue, shortAddr, timeAgo } from "@/lib/format";
+import { OfficialBadge } from "@/components/Official";
 
 function Copy({ value, label }: { value: string; label?: string }) {
   const [done, setDone] = useState(false);
@@ -49,6 +50,7 @@ function Header({ t }: { t: Token }) {
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h1 className="truncate text-2xl font-bold tracking-tight sm:text-3xl">{t.name}</h1>
           <span className="text-sm text-muted">{t.symbol}</span>
+          <span className="self-center"><OfficialBadge address={t.address} label size={16} /></span>
           <Copy value={t.address} />
         </div>
         <div className="mt-2.5 flex flex-wrap items-center gap-2">

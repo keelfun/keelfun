@@ -4,6 +4,7 @@ import type { Token } from "@/lib/api";
 import { pairInfo } from "@/lib/config";
 import { fmtPct, fmtValue } from "@/lib/format";
 import { TokenAvatar } from "./TokenAvatar";
+import { OfficialBadge } from "./Official";
 
 const LINE = "M0 250 C 90 250, 150 215, 230 205 S 360 150, 430 160 S 540 235, 620 185 S 760 70, 840 75 S 900 60, 960 40";
 
@@ -42,7 +43,7 @@ export function HeroChart({ featured, ethUsd }: { featured?: Token; ethUsd: numb
           <div className="flex items-center gap-3">
             <TokenAvatar src={featured.image} symbol={featured.symbol} />
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold">${featured.symbol}</p>
+              <p className="flex items-center gap-1.5 truncate font-semibold">${featured.symbol}<OfficialBadge address={featured.address} /></p>
               <p className="flex items-center gap-1.5 text-xs text-muted">
                 Paired with
                 {pair?.logo && <img src={pair.logo} alt="" className="h-3.5 w-3.5 rounded-full" />}

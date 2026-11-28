@@ -9,11 +9,12 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CandlestickSeries, ColorType, createChart, HistogramSeries, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import { AnySwap } from "@/components/AnySwap";
-import { TokenAvatar } from "@/components/TokenAvatar";
 import { api, type Token } from "@/lib/api";
 import { dexLabel, fetchOhlcv, fetchPool, fetchPoolTrades, fetchTokenTopPool, type PoolDetail } from "@/lib/basePools";
 import { explorerToken, getNet, NETS, parseNet, setNet } from "@/lib/net";
 import { fmtCompact, fmtPrice, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
+import { OfficialBadge } from "@/components/Official";
+import { PoolAvatar } from "@/components/PoolAvatar";
 
 const TF = [
   { l: "1m", tf: "minute", a: 1 },
@@ -126,11 +127,12 @@ function PairView() {
     <div className="relative left-1/2 w-screen -translate-x-1/2 space-y-3 px-3 py-3 sm:px-4">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-line bg-panel px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
-          <TokenAvatar src={p.token.image} symbol={p.token.symbol} size={44} />
+          <PoolAvatar net={net} token={p.token} dex={p.dex} dexLabel={dexLabel(p.dex)} size={44} />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold">{p.token.symbol}</h1>
               <span className="text-sm text-muted">/ {p.quote}</span>
+              <OfficialBadge address={p.token.address} label />
               <button onClick={() => toggleSet("keel-watch", p.token.address)} className={watched ? "text-warn" : "text-dim hover:text-fg"} title={watched ? "Remove from watchlist" : "Add to watchlist"} aria-label="Watchlist">
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill={watched ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z" /></svg>
               </button>

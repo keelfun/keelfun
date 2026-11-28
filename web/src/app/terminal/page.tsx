@@ -12,6 +12,7 @@ import { pairInfo } from "@/lib/config";
 import { explorerToken, NETS, normAddr, pairHref, useNet, type Net } from "@/lib/net";
 import { fmtCompact, fmtPct, fmtPrice, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
 import { errMsg } from "@/lib/tx";
+import { OfficialBadge } from "@/components/Official";
 
 const COLS = [
   { sort: "new", title: "New Pairs" },
@@ -180,6 +181,7 @@ function Row({ t, ethUsd, amount, buy }: { t: Token; ethUsd: number; amount: str
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-bold">{t.symbol}</span>
+            <OfficialBadge address={t.address} />
             <span className={`${chip} border-line text-muted`}>TAX {t.buyBps / 100}%</span>
             <button
               onClick={(e) => (e.preventDefault(), navigator.clipboard.writeText(t.address).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1000))))}
@@ -315,6 +317,7 @@ function BaseRow({ p, amount, buy }: { p: BasePool; amount: string; buy: (p: Bas
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-bold">{t.symbol}</span>
+            <OfficialBadge address={t.address} />
             <span className="truncate text-xs text-dim">{t.name}</span>
             <button
               onClick={(e) => (e.preventDefault(), navigator.clipboard.writeText(t.address).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1000))))}

@@ -10,6 +10,7 @@ import { BRAND, chain, DEPLOYED, PAIRS, pairInfo } from "@/lib/config";
 import { PairLogo, PairPicker } from "@/components/PairPicker";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { fmtCompact, fmtPct, fmtValue, timeAgo } from "@/lib/format";
+import { OfficialBadge } from "@/components/Official";
 
 const TABS = [
   { id: "top", label: "Market cap" },
@@ -174,7 +175,7 @@ export default function Home() {
                         <Link href={`/token/?a=${t.address}`} className="flex items-center gap-3">
                           <TokenAvatar src={t.image} symbol={t.symbol} />
                           <span className="min-w-0">
-                            <span className="block truncate font-medium">{t.name}</span>
+                            <span className="flex items-center gap-1.5 truncate font-medium">{t.name}<OfficialBadge address={t.address} /></span>
                             <span className="block text-xs text-muted">${t.symbol}</span>
                           </span>
                         </Link>

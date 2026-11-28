@@ -4,6 +4,7 @@ import type { Token } from "@/lib/api";
 import { fmtCompact, fmtPct, fmtValue, shortAddr, timeAgo } from "@/lib/format";
 import { pairInfo } from "@/lib/config";
 import { TokenAvatar } from "./TokenAvatar";
+import { OfficialBadge } from "./Official";
 
 export function TokenCard({ t, ethUsd, i = 0 }: { t: Token; ethUsd: number; i?: number }) {
   const up = t.change24h >= 0;
@@ -29,6 +30,7 @@ export function TokenCard({ t, ethUsd, i = 0 }: { t: Token; ethUsd: number; i?: 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate font-semibold">{t.name}</p>
+            <OfficialBadge address={t.address} />
             <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] font-medium text-accent-fg">{t.buyBps / 100}/{t.sellBps / 100}%</span>
           </div>
           <p className="font-mono text-xs text-muted">
