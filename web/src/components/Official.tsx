@@ -62,14 +62,14 @@ export function KeelCA({ className = "", short = false }: { className?: string; 
         $KEEL
       </a>
       <span className="shrink-0 text-dim">CA</span>
-      <button onClick={copy} title="Copy contract address" className="min-w-0 truncate font-mono text-fg/90 hover:text-fg">
+      <button onClick={copy} title="Copy contract address" className="min-w-0 shrink truncate font-mono text-fg/90 hover:text-fg">
         {short ? `${KEEL_CA.slice(0, 6)}…${KEEL_CA.slice(-4)}` : KEEL_CA}
       </button>
       <button onClick={copy} className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[11px] text-muted hover:text-fg">
         {done ? "Copied" : "Copy"}
       </button>
       <a href={`https://basescan.org/token/${KEEL_CA}`} target="_blank" rel="noreferrer" className="shrink-0 pr-1.5 text-[11px] text-accent-fg hover:underline">
-        Basescan ↗
+        <span className="hidden sm:inline">Basescan </span>↗
       </a>
     </div>
   );
