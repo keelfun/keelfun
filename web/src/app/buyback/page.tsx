@@ -1,5 +1,6 @@
 "use client";
 import { Em, Faq, Num, PageHero } from "@/components/PageHero";
+import { KeelCA } from "@/components/Official";
 import { useStats } from "@/lib/api";
 import { BRAND, FEE_TIERS } from "@/lib/config";
 import { fmtEth, fmtValue } from "@/lib/format";
@@ -32,8 +33,9 @@ export default function BuybackPage() {
         <p className="text-sm text-muted">Burned by buybacks</p>
         <p className="mt-1 font-serif text-6xl sm:text-7xl">0 <span className="text-3xl text-fg/60">KEEL</span></p>
         <p className="mt-2 max-w-xl text-sm text-muted">
-          $KEEL isn&apos;t live yet. The buyback switches on the day it launches. Until then its share of every platform fee is set aside for it.
+          $KEEL is live on Base. The automatic buyback hasn&apos;t started yet; until it does, its share of every platform fee is set aside for it.
         </p>
+        <KeelCA short className="mt-4" />
         <div className="mt-6 h-1.5 w-full rounded-full bg-line"><div className="h-full w-0 rounded-full bg-accent" /></div>
         <div className="mt-6 grid gap-6 sm:grid-cols-2">
           <Stat k="1 · Automatic buyback" v={eth(set)} sub={`${SHARE}% of platform fees, set aside so far`} />
@@ -49,7 +51,7 @@ export default function BuybackPage() {
             {SHARE}% of every platform fee buys $KEEL in its own Uniswap v4 pool and burns it, around the clock, in small buys under a daily cap so it never moves the price all at once.
           </p>
           <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-warn/30 bg-warn/10 px-3 py-1 text-xs text-warn">
-            <span className="h-1.5 w-1.5 rounded-full bg-warn" /> Not running yet · starts with $KEEL
+            <span className="h-1.5 w-1.5 rounded-full bg-warn" /> Not running yet · $KEEL is live, buyback starts soon
           </p>
           <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <Stat k="Platform fees earned" v={eth(fees)} sub={fmtValue(fees, usd)} />
@@ -90,7 +92,7 @@ export default function BuybackPage() {
         <Faq
           items={[
             ["Where do these numbers come from?", `They're read from the chain by ${BRAND}'s indexer: every platform fee is an onchain transfer in the trade that paid it, and anyone can recompute them.`],
-            ["When does the buyback start?", "The day $KEEL launches. Everything set aside before then is spent by the buyback in its first weeks, under the same daily cap."],
+            ["When does the buyback start?", "$KEEL is live, and the buyback switches on soon. Everything set aside before then is spent by the buyback in its first weeks, under the same daily cap."],
             ["Is every bought token burned?", "Yes. Each buy sends its $KEEL to the dead address in the same transaction, so it's out of supply for good."],
             ["Why a daily cap?", "So the buyback is steady pressure, not a single spike anyone could trade against."],
           ]}

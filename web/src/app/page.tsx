@@ -10,7 +10,7 @@ import { BRAND, chain, DEPLOYED, PAIRS, pairInfo } from "@/lib/config";
 import { PairLogo, PairPicker } from "@/components/PairPicker";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { fmtCompact, fmtPct, fmtValue, timeAgo } from "@/lib/format";
-import { OfficialBadge, pinOfficial } from "@/components/Official";
+import { KeelCA, OfficialBadge, pinOfficial } from "@/components/Official";
 
 const TABS = [
   { id: "top", label: "Market cap" },
@@ -60,6 +60,10 @@ export default function Home() {
             <Link href="/docs/" className="text-sm text-fg/90 underline-offset-4 hover:underline">
               How {BRAND} works
             </Link>
+          </div>
+          <div className="mt-6">
+            <span className="hidden sm:inline"><KeelCA /></span>
+            <span className="sm:hidden"><KeelCA short /></span>
           </div>
           {!DEPLOYED && (
             <p className="mt-6 inline-flex items-center gap-2 rounded-full border border-warn/30 bg-bg/60 px-3 py-1 text-xs text-warn backdrop-blur">

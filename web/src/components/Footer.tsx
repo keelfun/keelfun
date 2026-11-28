@@ -3,6 +3,7 @@ import { BRAND, SOCIALS } from "@/lib/config";
 import { Logo } from "./Header";
 import { Socials } from "./Socials";
 import { BASE_DOCS, BuiltOnBase } from "./BuiltOnBase";
+import { KeelCA } from "./Official";
 
 const T = "https://terminal.keelfun.app";
 const COLS: [string, [string, string][]][] = [
@@ -29,6 +30,7 @@ export function Footer() {
           <div className="mt-4 flex items-center gap-2">
             <Socials />
           </div>
+          <KeelCA short className="mt-4" />
           <BuiltOnBase className="mt-4" />
         </div>
         {COLS.map(([title, links]) => (
@@ -55,6 +57,7 @@ export function Footer() {
       <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 text-xs text-dim">
         <span className="flex items-center gap-2"><Logo className="h-4 w-4" />{BRAND} Terminal · Base</span>
         <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <KeelCA short />
           <Link href="https://keelfun.app/" className="hover:text-fg">{BRAND} ↗</Link>
           <Link href="https://keelfun.app/docs/" className="hover:text-fg">Docs</Link>
           <Link href="https://keelfun.app/api/" className="hover:text-fg">API</Link>

@@ -16,8 +16,11 @@
 <p align="center">
   <a href="https://keelfun.app"><b>keelfun.app</b></a> ·
   <a href="https://x.com/keelfunapp">X @keelfunapp</a> ·
+  <a href="https://keelfun.app/token/?a=0x2a2791927af5877723be6026e6fb0966d3df0147">$KEEL</a> ·
   <a href="https://basescan.org/address/0xDC802747d6c5271e2fC8a51bc52D279bDb80b463">Factory on Basescan</a>
 </p>
+
+<p align="center"><b>$KEEL CA:</b> <code>0x2a2791927af5877723be6026e6fb0966d3df0147</code></p>
 
 ---
 
@@ -61,6 +64,20 @@
 </table>
 
 <p align="center"><img src="docs/images/mobile.jpg" width="300" alt="Keel on mobile" /></p>
+
+## $KEEL
+
+The official Keelfun token, launched on Keelfun itself.
+
+| | |
+|---|---|
+| **CA** | [`0x2a2791927af5877723be6026e6fb0966d3df0147`](https://basescan.org/token/0x2a2791927af5877723be6026e6fb0966d3df0147) |
+| **Chain** | Base (8453) |
+| **Supply** | 1,000,000,000, fixed |
+| **Pool** | Uniswap v4, KEEL/ETH, LP locked forever |
+| **Trade** | [keelfun.app](https://keelfun.app/token/?a=0x2a2791927af5877723be6026e6fb0966d3df0147) · [DexScreener](https://dexscreener.com/base/0x2a2791927af5877723be6026e6fb0966d3df0147) |
+
+Always check the CA before buying. Any other address claiming to be $KEEL is not ours.
 
 ## Contracts (Base mainnet, chain 8453)
 
@@ -121,3 +138,4 @@ Set `NEXT_PUBLIC_CHAIN_ID=84532` to run against Base Sepolia, with your own depl
 - App: https://keelfun.app
 - Docs: https://keelfun.app/docs/
 - X: https://x.com/keelfunapp
+- $KEEL: `0x2a2791927af5877723be6026e6fb0966d3df0147`
