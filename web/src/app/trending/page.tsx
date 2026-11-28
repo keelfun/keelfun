@@ -9,7 +9,7 @@ import { useSet } from "@/lib/sets";
 import { addrOnNet, NETS, pairHref, useNet } from "@/lib/net";
 import { fmtCompact, fmtPrice, fmtUsd, timeAgo } from "@/lib/format";
 import { errMsg } from "@/lib/tx";
-import { OfficialBadge } from "@/components/Official";
+import { OfficialBadge, useOfficialPools, withPinned } from "@/components/Official";
 
 const DUR = ["5m", "1h", "6h", "24h"] as const;
 
@@ -80,7 +80,9 @@ export default function TrendingPage() {
     retry: 3,
     retryDelay: (n) => 2000 * (n + 1),
   });
-  const data = cjk ? all?.filter((p) => /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(p.token.name + p.token.symbol)) : all;
+  const pinOn = tab === "trending" && !q.trim() && !cjk;
+  const pinned = useOfficialPools(net, pinOn);
+  const data = cjk ? all?.filter((p) => /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(p.token.name + p.token.symbol)) : pinOn ? withPinned(all, pinned) : all;
   const th = "px-3 py-2.5 text-left text-xs font-normal text-dim";
   return (
     <div className="space-y-4 py-6">

@@ -1,3 +1,8 @@
+"use client";
+import { useQuery } from "@tanstack/react-query";
+import { fetchPoolsByToken, type BasePool } from "@/lib/basePools";
+import type { Net } from "@/lib/net";
+
 export const OFFICIAL = new Set(
   (process.env.NEXT_PUBLIC_OFFICIAL_TOKENS || "0x2a2791927af5877723be6026e6fb0966d3df0147").toLowerCase().split(",").map((s) => s.trim()),
 );
@@ -17,4 +22,25 @@ export function OfficialBadge({ address, label = false, size = 14 }: { address?:
       {icon}Official
     </span>
   );
+}
+
+export function pinOfficial<T>(list: T[] | undefined, addr: (x: T) => string): T[] | undefined {
+  if (!list) return list;
+  return [...list.filter((x) => isOfficial(addr(x))), ...list.filter((x) => !isOfficial(addr(x)))];
+}
+
+export function useOfficialPools(net: Net, on = true) {
+  return useQuery({
+    queryKey: ["official-pools", net],
+    queryFn: () => fetchPoolsByToken([...OFFICIAL], net),
+    enabled: on && net === "base" && OFFICIAL.size > 0,
+    staleTime: 30000,
+    refetchInterval: 60000,
+  }).data;
+}
+
+export function withPinned(list: BasePool[] | undefined, pinned: BasePool[] | undefined) {
+  if (!list || !pinned?.length) return pinOfficial(list, (p) => p.token.address);
+  const keys = new Set(pinned.map((p) => p.token.address.toLowerCase()));
+  return [...pinned, ...list.filter((p) => !keys.has(p.token.address.toLowerCase()))];
 }

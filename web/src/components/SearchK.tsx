@@ -8,7 +8,7 @@ import { api, type Token } from "@/lib/api";
 import { fetchBasePools } from "@/lib/basePools";
 import { isSolAddr, NETS, pairHref, tokenHref, useNet } from "@/lib/net";
 import { fmtUsd, shortAddr } from "@/lib/format";
-import { OfficialBadge } from "./Official";
+import { OfficialBadge, pinOfficial } from "./Official";
 
 type Item = { key: string; href: string; img: string | null; title: string; sub: string; right?: string; tag: string; addr?: string };
 
@@ -50,7 +50,7 @@ export function SearchK({ wide = false }: { wide?: boolean }) {
     items.push({ key: "t", href: tokenHref(dq.toLowerCase(), net === "solana" ? "base" : net), img: null, title: "Open token", sub: shortAddr(dq), tag: "Token" });
   }
   if (isSol) items.push({ key: "t", href: tokenHref(dq, "solana"), img: null, title: "Open token", sub: shortAddr(dq), tag: "Solana" });
-  for (const t of keel.data?.tokens ?? [])
+  for (const t of pinOfficial(keel.data?.tokens, (x) => x.address) ?? [])
     items.push({ key: `k${t.address}`, href: `/token/?a=${t.address}`, img: t.image, title: t.symbol, sub: t.name, right: fmtUsd(t.fdvEth * (keel.data?.ethUsd ?? 0)), tag: "Keelfun", addr: t.address });
   for (const p of (base.data ?? []).slice(0, 8))
     items.push({ key: `b${p.pool}`, href: pairHref(p.pool, p.net), img: p.token.image, title: `${p.token.symbol} / ${p.quote}`, sub: p.token.name, right: fmtUsd(p.mcUsd), tag: NETS[p.net].label, addr: p.token.address });

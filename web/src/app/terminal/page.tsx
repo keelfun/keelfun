@@ -12,7 +12,7 @@ import { pairInfo } from "@/lib/config";
 import { explorerToken, NETS, normAddr, pairHref, useNet, type Net } from "@/lib/net";
 import { fmtCompact, fmtPct, fmtPrice, fmtUsd, shortAddr, timeAgo } from "@/lib/format";
 import { errMsg } from "@/lib/tx";
-import { OfficialBadge } from "@/components/Official";
+import { OfficialBadge, pinOfficial, useOfficialPools, withPinned } from "@/components/Official";
 
 const COLS = [
   { sort: "new", title: "New Pairs" },
@@ -253,12 +253,12 @@ function Column({ sort, title, buy, hidden, view }: ColProps<Token>) {
   const [watch] = useWatch();
   const [hid] = useHidden();
   const ethUsd = data?.ethUsd ?? 0;
-  const list = data?.tokens.filter((t) => {
+  const list = pinOfficial(data?.tokens.filter((t) => {
     const a = t.address.toLowerCase();
     if (view === "watch" && !watch.includes(a)) return false;
     if (!lane.showHidden && hid.includes(a)) return false;
     return passLane(lane, { liq: t.liquidityEth * ethUsd, vol: t.volume24hEth * ethUsd, mc: t.fdvEth * ethUsd, created: t.createdAt });
-  });
+  }), (t) => t.address);
   return (
     <section className={`${hidden ? "hidden lg:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-line lg:border-r`}>
       <div className="flex items-center gap-2 border-b border-line px-3 py-2">
@@ -401,12 +401,14 @@ function BaseColumn({ sort, title, buy, hidden, view }: ColProps<BasePool>) {
     retryDelay: (n) => 2000 * (n + 1),
     staleTime: 15000,
   });
-  const list = data?.pools.filter((p) => {
+  const pinned = useOfficialPools(net, !dq && view !== "watch");
+  const filtered = data?.pools.filter((p) => {
     const a = normAddr(p.token.address);
     if (view === "watch" && !watch.includes(a)) return false;
     if (!lane.showHidden && hid.includes(a)) return false;
     return passLane(lane, { liq: p.liqUsd, vol: p.vol24, mc: p.mcUsd, created: p.createdAt });
   });
+  const list = !dq && view !== "watch" ? withPinned(filtered, pinned) : filtered;
   return (
     <section className={`${hidden ? "hidden lg:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-line lg:border-r`}>
       <div className="flex items-center gap-2 border-b border-line px-3 py-2">

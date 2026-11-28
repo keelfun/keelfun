@@ -9,7 +9,7 @@ import { chain } from "@/lib/config";
 import { fmtPct, fmtUsd } from "@/lib/format";
 import { useSet } from "@/lib/sets";
 import { useVault } from "@/lib/vault";
-import { OfficialBadge } from "./Official";
+import { OfficialBadge, useOfficialPools, withPinned } from "./Official";
 
 const MULTICALL = "0xcA11bde05977b3631167028862bE2a173976CA11";
 const ethBalAbi = [{ type: "function", name: "getEthBalance", stateMutability: "view", inputs: [{ name: "addr", type: "address" }], outputs: [{ name: "balance", type: "uint256" }] }] as const;
@@ -61,7 +61,8 @@ export function TickerStrip() {
     refetchInterval: 60000,
     staleTime: 30000,
   });
-  const items = (data ?? []).slice(0, 24);
+  const pinned = useOfficialPools(net, !watch.length);
+  const items = (watch.length ? data ?? [] : withPinned(data ?? [], pinned) ?? []).slice(0, 24);
   return (
     <div className="no-scrollbar flex h-8 items-center gap-5 overflow-x-auto border-t border-line px-4 text-xs">
       <span className={`flex shrink-0 items-center gap-1.5 ${watch.length ? "text-warn" : "text-dim"}`} title={watch.length ? "Your watchlist" : "Star tokens in Pulse to build your watchlist"}>

@@ -10,7 +10,7 @@ import { BRAND, chain, DEPLOYED, PAIRS, pairInfo } from "@/lib/config";
 import { PairLogo, PairPicker } from "@/components/PairPicker";
 import { TokenAvatar } from "@/components/TokenAvatar";
 import { fmtCompact, fmtPct, fmtValue, timeAgo } from "@/lib/format";
-import { OfficialBadge } from "@/components/Official";
+import { OfficialBadge, pinOfficial } from "@/components/Official";
 
 const TABS = [
   { id: "top", label: "Market cap" },
@@ -32,6 +32,7 @@ export default function Home() {
   }, [input]);
   const { data, isLoading, error } = useTokens(sort, q, pairIdx >= 0 ? PAIRS[pairIdx].address.toLowerCase() : "");
   const { data: stats } = useStats();
+  const tokens = pinOfficial(data?.tokens, (t) => t.address) ?? [];
   const ethUsd = data?.ethUsd ?? stats?.ethUsd ?? 0;
 
   return (
@@ -40,7 +41,7 @@ export default function Home() {
         <img src="/art/hero.webp" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-[70%_40%] opacity-90" />
         <div className="absolute inset-0 bg-gradient-to-r from-bg/85 via-bg/30 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-b from-bg/30 via-transparent to-bg" />
-        <HeroChart featured={data?.tokens[0]} ethUsd={ethUsd} />
+        <HeroChart featured={tokens[0]} ethUsd={ethUsd} />
         <div className="anim-rise relative mx-auto max-w-7xl px-4 pb-10 pt-16 sm:px-6 sm:pb-14 sm:pt-28">
           <h1 className="max-w-3xl font-serif text-[44px] leading-[1.02] tracking-tight sm:text-7xl">
             The steady way to <em className="text-accent-soft">launch</em> on Base
@@ -148,7 +149,7 @@ export default function Home() {
       ) : data && data.tokens.length > 0 ? (
         view === "grid" ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {data.tokens.map((t, i) => (
+            {tokens.map((t, i) => (
               <TokenCard key={t.address} t={t} ethUsd={ethUsd} i={i} />
             ))}
           </div>
@@ -167,7 +168,7 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {data.tokens.map((t) => {
+                {tokens.map((t) => {
                   const p = pairInfo(t.pair);
                   return (
                     <tr key={t.address} className="anim-rise border-b border-line/60 last:border-0 hover:bg-panel-2">
